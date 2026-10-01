@@ -1,0 +1,38 @@
+# Release binaries for people who run the agent without Docker.
+# `goreleaser release --snapshot --clean` tries it locally.
+version: 2
+
+before:
+  hooks:
+    # The UI is embedded into the binary, so it's built first.
+    - sh -c "cd web && npm ci && npm run build"
+
+builds:
+  - id: uptimy-agent
+    main: ./cmd/uptimy-agent
+    binary: uptimy-agent
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{ .Version }}"]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md, CHANGELOG.md, examples/monitors.yaml]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]
+
+release:
+  footer: |
+    Docker: `docker run -p 8080:8080 -v uptimy-data:/data ghcr.io/uptimy/agent:{{ .Version }}`

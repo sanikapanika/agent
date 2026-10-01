@@ -1,0 +1,26 @@
+# Changelog
+
+Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+First public release.
+
+### Monitoring
+- Healthchecks: HTTP(S) with status and keyword checks, ping (unprivileged ICMP), TCP, DNS, TLS certificate expiry, Kubernetes workloads, and PostgreSQL, MySQL and Redis (real logins and queries).
+- Heartbeats for cron jobs, backups and workers: an interval or a cron schedule in any time zone with a grace period; start, fail and exit-code pings; run history with duration and the job's output; on-time rate, missed and failed runs.
+- Alerts by email (SMTP), Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty (incidents open and resolve) and webhooks, on down and on recovery. Each channel alerts for every monitor or only chosen ones.
+- Maintenance windows: no alerts during planned work, a held alert when a monitor is still down afterwards, and a notice on the status page.
+- Healthchecks and heartbeats in YAML (`MONITORS_FILE` / `MONITORS_YAML`) alongside the UI.
+
+### Status page
+- Public page at `/status` with a logo (and dark-mode logo), accent color, website link and sections. Shows names with uptime or on-time rate only, never targets. Sections and their monitors are managed in the status page editor (drag to reorder, rename inline), as on the Uptimy platform. Announces maintenance, in progress and up to a week ahead.
+
+### Uptimy
+- "Watch the watcher": connect to Uptimy in one click, and Uptimy alerts from outside when the agent stops checking in, with a configurable delay and maintenance windows.
+
+### Running it
+- One binary with the UI built in; Docker images, a Helm chart and a Railway template.
+- Users with admin and viewer roles; light and dark themes.
+- API tokens (full or read-only) for scripts and CI.
+- Import monitors and notifications from Uptime Kuma (`kuma.db`), with a review step.

@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "uptimy-agent.fullname" . }}
+  labels: {{- include "uptimy-agent.labels" . | nindent 4 }}
+spec:
+  replicas: 1   # SQLite: one writer. Recreate avoids two pods sharing the volume.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "uptimy-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "uptimy-agent.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}{{ toYaml . | nindent 8 }}{{- end }}
+    spec:
+      serviceAccountName: {{ include "uptimy-agent.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+        # Lets ping checks use unprivileged ICMP sockets, so the agent needs
+        # no NET_RAW capability. A "safe" sysctl, allowed by default.
+        sysctls:
+          - name: net.ipv4.ping_group_range
+            value: "0 2147483647"
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: DATA_DIR
+              value: /data
+            - name: AGENT_NAME
+              value: {{ .Values.agentName | default .Release.Name | quote }}
+            - name: RETENTION_DAYS
+              value: {{ .Values.retentionDays | quote }}
+            {{- if or .Values.healthchecks .Values.heartbeats }}
+            - name: MONITORS_FILE
+              value: /config/monitors.yaml
+            {{- end }}
+            {{- if or .Values.adminPassword .Values.existingSecret }}
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret | default (include "uptimy-agent.fullname" .) }}
+                  key: ADMIN_PASSWORD
+            {{- end }}
+            {{- if or .Values.uptimy.heartbeatUrl .Values.uptimy.existingSecret }}
+            - name: UPTIMY_HEARTBEAT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.uptimy.existingSecret | default (include "uptimy-agent.fullname" .) }}
+                  key: UPTIMY_HEARTBEAT_URL
+            {{- end }}
+            {{- with .Values.extraEnv }}{{ toYaml . | nindent 12 }}{{- end }}
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 30
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            {{- if or .Values.healthchecks .Values.heartbeats }}
+            - name: config
+              mountPath: /config
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "uptimy-agent.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if or .Values.healthchecks .Values.heartbeats }}
+        - name: config
+          configMap:
+            name: {{ include "uptimy-agent.fullname" . }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

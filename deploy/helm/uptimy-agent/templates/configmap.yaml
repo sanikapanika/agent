@@ -1,0 +1,10 @@
+{{- if or .Values.healthchecks .Values.heartbeats }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "uptimy-agent.fullname" . }}
+  labels: {{- include "uptimy-agent.labels" . | nindent 4 }}
+data:
+  monitors.yaml: |
+    {{- dict "healthchecks" .Values.healthchecks "heartbeats" .Values.heartbeats | toYaml | nindent 4 }}
+{{- end }}

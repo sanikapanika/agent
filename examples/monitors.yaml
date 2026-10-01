@@ -1,0 +1,85 @@
+# Healthchecks and heartbeats as code. Load with MONITORS_FILE=/path/to/file,
+# or put the YAML itself in MONITORS_YAML (handy on Railway and other PaaS).
+# Monitors are matched by name: edits here keep their history, and entries
+# removed from the file are deleted on the next start. Which monitors appear
+# on the status page, and where, is set in the status page editor.
+
+# Healthchecks: the agent checks a target on an interval.
+healthchecks:
+  - name: Website
+    type: http
+    target: https://example.com
+    interval: 60s
+
+  - name: API health
+    type: http
+    target: https://api.example.com/health
+    interval: 30s
+    failure_threshold: 3
+    config:
+      expected_status: "200"
+      keyword: '"status":"ok"'
+
+  # Internal services: reachable only from inside the cluster / project.
+  # Database checks log in and run a query on a fresh connection each time.
+  # ${VAR} is read from the agent's environment when the check runs, so the
+  # password can live in a Secret instead of this file. Use a read-only user.
+  - name: Postgres
+    type: postgres
+    target: postgres://monitor:${PG_PASSWORD}@postgres.default.svc:5432/app?sslmode=require
+
+  - name: Postgres is the primary
+    type: postgres
+    target: ${PG_URL}                 # the whole URL from the environment
+    config:
+      query: SELECT pg_is_in_recovery()
+      expected: "false"             # first column of the first row
+
+  - name: MySQL
+    type: mysql
+    target: mysql://monitor:${MYSQL_PASSWORD}@mysql.default.svc:3306/shop   # ?tls=true to require TLS
+
+  - name: Redis
+    type: redis
+    target: redis://:${REDIS_PASSWORD}@redis.default.svc:6379/0             # rediss:// for TLS
+
+  - name: RabbitMQ port
+    type: tcp
+    target: rabbitmq.default.svc:5672
+
+  - name: Office router
+    type: ping                       # 3 ICMP echo requests; up if any reply
+    target: 10.0.0.1
+
+  - name: Checkout deployment
+    type: kubernetes
+    target: shop/deployment/checkout
+
+  - name: MX records
+    type: dns
+    target: example.com
+    config:
+      record_type: MX
+      expected: mail.example.com   # substring of the answers
+      resolver: 1.1.1.1            # optional
+
+  - name: Certificate
+    type: tls
+    target: example.com
+    interval: 6h
+    config:
+      min_days_remaining: 21
+
+# Heartbeats: a scheduled job pings the agent each time it runs, and you're
+# alerted when a run is missed or the job reports a failure. Ping
+# /ping/<token> when it's done; add /start before it begins to record how
+# long it takes, /fail (or /<exit code>) if it failed. The token is shown in
+# the UI; set `token:` to choose it yourself.
+heartbeats:
+  - name: Nightly backup
+    cron: "0 3 * * *"                # on a cron schedule...
+    timezone: Europe/Berlin          # ...in this time zone (default UTC)
+    grace: 30m                       # how late a run may be (default 5m)
+
+  - name: Queue worker
+    every: 5m                        # or every so often

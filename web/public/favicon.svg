@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="32" height="32" role="img" aria-label="Uptimy"><title>Uptimy</title><rect width="512" height="512" rx="120" fill="#0b0c0e"/><g transform="translate(256 262) scale(0.92) translate(-375 -231)"><defs>
+    <linearGradient id="f-rise" gradientUnits="userSpaceOnUse" x1="318" y1="321" x2="416" y2="141">
+      <stop offset="0.16" stop-color="#ffffff"/>
+      <stop offset="0.52" stop-color="#0fca82"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke-width="64" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke="#ffffff" d="M160 250H272L318 321"/>
+    <path stroke="url(#f-rise)" d="M318 321L416 141L440 171H590"/>
+  </g></g></svg>

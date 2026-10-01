@@ -1,0 +1,87 @@
+image:
+  repository: ghcr.io/uptimy/agent
+  tag: ""            # defaults to the chart appVersion
+  pullPolicy: IfNotPresent
+
+# Password for the default "admin" user. Leave empty and a random one is
+# printed once in the pod log (kubectl logs deploy/uptimy-agent) and must be
+# changed at first sign-in. Or point at an existing Secret with existingSecret.
+adminPassword: ""
+existingSecret: ""         # Secret with key ADMIN_PASSWORD
+
+# How this agent is labelled in Uptimy. Defaults to the release name
+# (the pod's hostname would change on every restart).
+agentName: ""
+
+# Optional: "Connect to Uptimy" in the agent's Settings does this with one
+# click. Set heartbeatUrl only to pin it in config (read-only in the UI).
+uptimy:
+  heartbeatUrl: ""
+  existingSecret: ""       # Secret with key UPTIMY_HEARTBEAT_URL
+
+# Declarative monitors, rendered into a ConfigMap. Same schema as
+# examples/monitors.yaml. Leave both empty to manage monitors in the UI only.
+healthchecks: []
+#  - name: Checkout API
+#    type: http
+#    target: http://checkout.shop.svc.cluster.local:8080/health
+#    interval: 30s
+#  - name: Checkout deployment
+#    type: kubernetes
+#    target: shop/deployment/checkout
+#  - name: Postgres
+#    type: postgres
+#    target: postgres://monitor:${PG_PASSWORD}@postgres.shop.svc:5432/shop
+heartbeats: []
+#  - name: Nightly backup
+#    cron: "0 3 * * *"
+#    timezone: Europe/Berlin
+#    grace: 30m
+
+retentionDays: 30
+
+# Read-only access to Deployments/StatefulSets/DaemonSets for kubernetes checks.
+rbac:
+  create: true
+  clusterWide: true        # false: only the release namespace
+
+serviceAccount:
+  create: true
+  name: ""
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+  existingClaim: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: status.example.com
+      paths: ["/"]
+  tls: []
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+podAnnotations: {}
+# Extra environment variables, e.g. database passwords for ${VAR} in monitor
+# targets:
+#  - name: PG_PASSWORD
+#    valueFrom:
+#      secretKeyRef: { name: postgres-monitor, key: password }
+extraEnv: []

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#33a36b" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Uptimy Agent</title>
+    <script>
+      // Apply the saved theme before first paint (see src/lib/theme.ts).
+      try {
+        var t = localStorage.getItem("uptimy-theme");
+        if (t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (e) {
+        if (matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.classList.add("dark");
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

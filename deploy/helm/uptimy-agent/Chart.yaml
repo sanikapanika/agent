@@ -1,0 +1,13 @@
+apiVersion: v2
+name: uptimy-agent
+description: Self-hosted uptime monitoring with status pages, running inside your cluster.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/uptimy/agent
+sources:
+  - https://github.com/uptimy/agent
+keywords: [uptime, monitoring, status-page, healthcheck, kubernetes]
+maintainers:
+  - name: Uptimy
+    url: https://www.upti.my

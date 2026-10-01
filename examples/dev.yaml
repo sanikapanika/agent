@@ -1,0 +1,25 @@
+# Sample monitors for `make run`. Real public targets, so checks succeed out
+# of the box; one deliberately failing port shows what "down" looks like.
+healthchecks:
+  - name: Uptimy
+    type: http
+    target: https://www.upti.my
+    interval: 30s
+  - name: Example
+    type: http
+    target: https://example.com
+    interval: 30s
+  - name: Example certificate
+    type: tls
+    target: example.com
+    interval: 1h
+  - name: Local Postgres (not running)
+    type: tcp
+    target: 127.0.0.1:5432
+    interval: 30s
+
+# Ping it with: curl http://localhost:8080/ping/dev-heartbeat-token-0001
+heartbeats:
+  - name: Sample job
+    every: 5m
+    token: dev-heartbeat-token-0001

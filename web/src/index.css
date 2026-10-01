@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+/* Dark mode follows the `dark` class on <html> (set by lib/theme.ts from the
+   user's Light/Dark/System choice), not the media query directly. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Uptimy palette: brand green (#33a36b) with neutral surfaces. */
+:root {
+  --background: #fafafa;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --primary: #268256;
+  --primary-foreground: #ffffff;
+  --ring: #33a36b;
+  --up: #33a36b;
+  --down: #ef4444;
+  --pending: #a1a1aa;
+  --paused: #f59e0b;
+  /* Status page palette, shared with upti.my-status */
+  --degraded: #f97316;
+  --up-soft: #65bd91;
+  --no-data: #d4d4d4;
+  /* Navigation, as in the app's sidebar (Sidebar.tsx NavItem): the active
+     item is a solid brand.500 pill; hover tints brand.50 / gray.900. */
+  --brand: #33a36b;
+  --nav-hover: #f4fbf7;
+  --sunken: #fafafa; /* the sidebar's header and footer strips (bg.sunken) */
+  color-scheme: light;
+}
+
+/* True black, matching the Uptimy app (upti.my-app components/ui/system.ts:
+   canvas black, surface gray.950, sunken gray.900, border gray.800). */
+:root.dark {
+  --background: #000000;
+  --foreground: #fafafa;
+  --card: #111111;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  --border: #27272a;
+  --input: #3f3f46;
+  --primary: #33a36b;
+  --primary-foreground: #ffffff;
+  --pending: #52525b;
+  --up-soft: rgb(51 163 107 / 0.8);
+  --no-data: #404040;
+  --nav-hover: #18181b;
+  --sunken: #18181b;
+  color-scheme: dark;
+}
+
+/* The public status page mirrors upti.my-status (app/globals.css .dark):
+   black cards on the black page, divided by borders. */
+:root.dark .status-surface {
+  --card: #000000;
+  --muted: #0d0d0d;
+  --border: #262626;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-pending: var(--pending);
+  --color-paused: var(--paused);
+  --color-degraded: var(--degraded);
+  --color-up-soft: var(--up-soft);
+  --color-no-data: var(--no-data);
+  --color-brand: var(--brand);
+  --color-nav-hover: var(--nav-hover);
+  --color-sunken: var(--sunken);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Dialogs scale in like the app's (Chakra motionPreset "scale"). */
+  --animate-dialog-in: dialog-in 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-toast-in: toast-in 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-dialog-in,
+  .animate-fade-in,
+  .animate-toast-in {
+    animation: none;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}

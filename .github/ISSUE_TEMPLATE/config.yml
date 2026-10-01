@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/uptimy/agent/security/advisories/new
+    about: Please report security issues privately, not as a public issue.
+  - name: Uptimy (hosted monitoring and status pages)
+    url: https://www.upti.my/?utm_source=github&utm_medium=issue_template&utm_campaign=agent
+    about: Questions about the hosted Uptimy platform.
