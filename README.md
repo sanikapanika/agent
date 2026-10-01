@@ -32,6 +32,10 @@ Because it runs next to your services, it can check things that external monitor
 
 ## Quick start
 
+On Railway, it's one click (see [Railway](#railway) below for what it sets up):
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/uptimy-agent?referralCode=-G2iM8&utm_medium=integration&utm_source=template&utm_campaign=agent-readme)
+
 ### Docker
 
 ```bash
@@ -70,7 +74,9 @@ heartbeats:
 
 ### Railway
 
-Deploy from this repo (it includes [`railway.json`](railway.json)) and add a volume mounted at `/data`. See [deploy/railway.md](deploy/railway.md) for the template settings. Services in the same project are reachable over private networking, so you can monitor `*.railway.internal` hosts that aren't exposed publicly.
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/uptimy-agent?referralCode=-G2iM8&utm_medium=integration&utm_source=template&utm_campaign=agent-readme)
+
+The template adds the agent to your project with a volume at `/data` and a generated `ADMIN_PASSWORD` (in the service's Variables tab). Services in the same project are reachable over private networking, so you can monitor `*.railway.internal` hosts that aren't exposed publicly, and your databases through reference variables. See it running in the [live demo](https://uptimy-agent-production-b9a3.up.railway.app/status), and [deploy/railway.md](deploy/railway.md) for the template settings and monitor examples. You can also deploy from this repo, which includes [`railway.json`](railway.json).
 
 ## Configuration
 

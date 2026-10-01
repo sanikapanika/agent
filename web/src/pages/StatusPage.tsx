@@ -271,11 +271,11 @@ function MonitorCard({ m }: { m: PublicMonitor }) {
           </span>
           <div className="min-w-0 flex-1">
             <h3 className="mb-1 text-sm font-medium sm:text-base">{m.name}</h3>
-            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-muted-foreground">
               {m.type_label}
             </span>
             {m.in_maintenance && (
-              <span className="ml-1.5 inline-flex items-center rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400">
+              <span className="ml-1.5 inline-flex items-center rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-sky-600 dark:text-sky-400">
                 Maintenance
               </span>
             )}
@@ -302,8 +302,10 @@ function MonitorCard({ m }: { m: PublicMonitor }) {
             {pct == null ? "--" : pct.toFixed(2)}%
           </div>
           <div className="text-xs text-muted-foreground">
-            {when.label}:{" "}
-            <span className="font-medium">{when.time ? new Date(when.time).toLocaleString() : "Never"}</span>
+            {when.label}: {/* Own line on phones, so the timestamp doesn't squeeze the name. */}
+            <span className="block font-medium sm:inline">
+              {when.time ? new Date(when.time).toLocaleString() : "Never"}
+            </span>
           </div>
         </div>
       </div>

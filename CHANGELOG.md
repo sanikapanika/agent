@@ -4,6 +4,14 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-01
+
+### Fixed
+- Status page on phones: a monitor's type badge no longer runs into its "Last change" time, and badges stay on one line.
+
+### Added
+- A one-click Railway template ("Deploy on Railway" in the README) and a live demo.
+
 ## [0.1.0] - 2026-10-01
 
 First public release.
@@ -28,5 +36,6 @@ First public release.
 - API tokens (full or read-only) for scripts and CI.
 - Import monitors and notifications from Uptime Kuma (`kuma.db`), with a review step.
 
-[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/uptimy/agent/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/uptimy/agent/releases/tag/v0.1.0

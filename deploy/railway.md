@@ -1,6 +1,10 @@
 # Railway template
 
-Settings for publishing Uptimy Agent as a one-click Railway template.
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/uptimy-agent?referralCode=-G2iM8&utm_medium=integration&utm_source=template&utm_campaign=agent-railway-docs)
+
+Uptimy Agent is published as a one-click Railway template. This page holds its
+settings, for maintaining the template or setting the agent up by hand. Live
+demo: https://uptimy-agent-production-b9a3.up.railway.app/status
 
 ## Service
 
