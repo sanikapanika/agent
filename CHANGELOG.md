@@ -4,6 +4,8 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-01
+
 First public release.
 
 ### Monitoring
@@ -18,9 +20,13 @@ First public release.
 
 ### Uptimy
 - "Watch the watcher": connect to Uptimy in one click, and Uptimy alerts from outside when the agent stops checking in, with a configurable delay and maintenance windows.
+- An Uptimy alert channel: paste the webhook URL of an Uptimy Agent integration, and down and recovery alerts open and resolve incidents in Uptimy, which can trigger workflows.
 
 ### Running it
 - One binary with the UI built in; Docker images, a Helm chart and a Railway template.
 - Users with admin and viewer roles; light and dark themes.
 - API tokens (full or read-only) for scripts and CI.
 - Import monitors and notifications from Uptime Kuma (`kuma.db`), with a review step.
+
+[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/uptimy/agent/releases/tag/v0.1.0
