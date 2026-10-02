@@ -4,18 +4,27 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-02
+
 ### Added
-- Settings → Kubernetes: discovery's status (last scan, scope, monitors found) and every problem it found, such as a mistyped label value or an invalid annotation, plus a browser of the cluster's resources, monitored or not, with the `kubectl label` command for one or for all shown. Empty healthcheck and heartbeat pages point to it when the agent runs in a cluster.
-- `upti.my/monitor` also accepts `yes`, `1` and `on`; `false`, `no`, `0` and `off` opt a resource out; other values are reported instead of ignored.
-- Discovered monitors show the object they came from ("Discovered in Kubernetes · service shop/checkout").
+- **CronJobs without pings:** label a CronJob `upti.my/monitor: "true"` and the agent creates a heartbeat on its schedule and time zone, and records each run from the CronJob's Jobs at the times Kubernetes saw them: start, finish, duration, and for a failure the reason with the container's exit code (`OOMKilled`, exit code 1, ...). Missed runs are detected from the schedule, and suspending the CronJob pauses the heartbeat. `upti.my/grace` sets how long after its scheduled time a run may finish (default: the Job's `activeDeadlineSeconds` plus a minute, or else the time between runs, at most an hour).
+- **Kubernetes Service checks** (`<namespace>/service/<name>`): up while the Service has a ready endpoint, reusing the pods' readinessProbes with no traffic to the app. Discovery uses them for Services annotated `upti.my/type: kubernetes`.
+- **Settings → Kubernetes:** discovery's status (last scan, scope, monitors found) and every problem it found, such as a mistyped label value, an invalid annotation or missing RBAC, plus a browser of the cluster's resources, monitored or not, with the `kubectl label` command for one or for all shown. Empty healthcheck and heartbeat pages point to it when the agent runs in a cluster.
+- **More services (Shoutrrr):** one alert channel URL reaches any of 30+ services, including Pushover, Gotify, Matrix, Google Chat, Mattermost, Rocket.Chat, Opsgenie, Signal, Zulip and Home Assistant. Errors never repeat the URL or its credentials.
+- The heartbeat form picks the interval and grace period on a slider (1 minute to 1 year), with the exact value editable below it.
+- Discovered monitors show the object they came from ("Discovered in Kubernetes · service shop/checkout"), and a discovered CronJob's page explains how its runs are read.
 
 ### Changed
-- Discovered monitors are tied to their Kubernetes object instead of their name: renaming one with `upti.my/name` keeps its history, and two objects may share a name. Monitors discovered by earlier versions are matched up on the first scan.
-- CronJobs without pings: label a CronJob `upti.my/monitor: "true"` and the agent creates a heartbeat on its schedule and time zone, and records each run from the CronJob's Jobs at the times Kubernetes saw them: start, finish, duration, and for a failure the reason with the container's exit code. Missed runs are detected from the schedule. Suspending the CronJob pauses the heartbeat. `upti.my/grace` sets how long after its scheduled time a run may finish (default: the Job's `activeDeadlineSeconds` plus a minute, or else the time between runs, at most an hour).
-- A "More services (Shoutrrr)" alert channel: one URL reaches any of 30+ services, including Pushover, Gotify, Matrix, Google Chat, Mattermost, Rocket.Chat, Opsgenie, Signal, Zulip and Home Assistant. Errors never repeat the URL or its credentials.
-- Discovered Services are checked on their pods' readinessProbe path (and scheme) instead of `/`, and ports with an HTTP readinessProbe get an HTTP check even when they don't look like HTTP.
-- Kubernetes Service checks (`<namespace>/service/<name>`): up while the Service has a ready endpoint, reusing the pods' readinessProbes with no traffic to the app. Discovery uses them for Services annotated `upti.my/type: kubernetes`.
-- The chart lets the agent read Services and EndpointSlices, and list pods when discovery is on.
+- Discovered Services are checked on their pods' readinessProbe path and scheme instead of `/`, and ports with an HTTP readinessProbe get an HTTP check even when they don't look like HTTP.
+- Discovered monitors are tied to their Kubernetes object instead of their name: renaming one with `upti.my/name` keeps its history, and two objects may share a name. Monitors discovered by 0.1.3 are matched up on the first scan.
+- `upti.my/monitor` also accepts `yes`, `1` and `on`; `false`, `no`, `0` and `off` opt a resource out explicitly; other values are reported instead of ignored.
+- A heartbeat whose run has started isn't shown as late while it runs; it counts as missed only if it hasn't finished by the deadline. A run noticed after its deadline that finished in time counts as on time.
+- The chart lets the agent read Services, EndpointSlices, CronJobs and Jobs, and list pods when discovery is on.
+
+### Fixed
+- An invalid `upti.my/` annotation no longer deletes the object's monitor and its history; it's kept as it was and reported.
+- The heartbeat page lists the newest runs first, 10 at a time.
+- Switching a heartbeat between a fixed interval and a cron expression no longer shifts the form, and rows of cards line up with the cards above them on the dashboard and heartbeat pages.
 
 ## [0.1.3] - 2026-10-02
 
@@ -60,7 +69,8 @@ First public release.
 - API tokens (full or read-only) for scripts and CI.
 - Import monitors and notifications from Uptime Kuma (`kuma.db`), with a review step.
 
-[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/uptimy/agent/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/uptimy/agent/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/uptimy/agent/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/uptimy/agent/compare/v0.1.0...v0.1.1
