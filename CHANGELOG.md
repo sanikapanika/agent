@@ -4,6 +4,9 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Added
+- Kubernetes auto-discovery: label a Service, Ingress, Gateway API HTTPRoute, Deployment, StatefulSet or DaemonSet with `upti.my/monitor: "true"` and the agent monitors it within 30 seconds. `upti.my/` annotations set the name, path, port, interval and more. Discovered monitors are read-only in the UI and are removed with the label. On by default in the chart (`discovery.enabled`), which now lets the agent list those resources.
+
 ## [0.1.2] - 2026-10-02
 
 ### Added

@@ -1,3 +1,4 @@
+import { managedLabel } from "@/components/MonitorEmpty";
 import { useState } from "react";
 import { useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -38,7 +39,7 @@ export function HeartbeatDetail() {
             <Badge>Heartbeat</Badge>
             <span>{h.schedule}</span>
             <span>· {formatDuration(h.heartbeat.grace_seconds * 1000)} grace</span>
-            {h.source === "file" && <Badge>Managed by monitors file</Badge>}
+            {h.source !== "ui" && <Badge>{managedLabel[h.source]}</Badge>}
           </span>
         }
         actions={<MonitorActions m={h} />}
@@ -186,7 +187,7 @@ function PingCard({ h }: { h: HeartbeatSummary }) {
             Have your job call this each time it runs. GET and POST both work.
           </p>
         </div>
-        {canEdit && h.source !== "file" && (
+        {canEdit && h.source === "ui" && (
           <Button
             variant="outline"
             size="sm"

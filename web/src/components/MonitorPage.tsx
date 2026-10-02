@@ -53,7 +53,7 @@ export function MonitorActions({ m, children }: { m: Monitor; children?: React.R
   });
 
   if (!canEdit) return null;
-  const fromFile = m.source === "file";
+  const managed = m.source !== "ui";
   const history = m.kind === "heartbeat" ? "run history" : "check history";
   return (
     <>
@@ -61,7 +61,7 @@ export function MonitorActions({ m, children }: { m: Monitor; children?: React.R
       <Button variant="outline" onClick={() => pause.mutate(!m.paused)} disabled={pause.isPending}>
         {m.paused ? <Play /> : <Pause />} {m.paused ? "Resume" : "Pause"}
       </Button>
-      {!fromFile && (
+      {!managed && (
         <>
           <Link to={`${monitorPath(m)}/edit`} className={buttonVariants({ variant: "outline" })}>
             <Pencil /> Edit

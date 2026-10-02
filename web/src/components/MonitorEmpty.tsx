@@ -1,7 +1,8 @@
 import { Link } from "react-router";
-import { FileCode2, Plus, Wrench } from "lucide-react";
+import { FileCode2, Plus, ShipWheel, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { kinds, type MonitorKind } from "@/lib/monitors";
+import type { MonitorSource } from "@/lib/api";
 import { buttonVariants } from "@/components/ui/button";
 import { useCanEdit } from "@/components/AuthGate";
 
@@ -47,10 +48,19 @@ export function MonitorEmpty({ kind, compact }: { kind: MonitorKind; compact?: b
 }
 
 /** Marks a monitor defined in the monitors file. */
-export function FileManagedIcon() {
+/** How a monitor defined outside the UI is labeled; edit it at its source. */
+export const managedLabel: Record<Exclude<MonitorSource, "ui">, string> = {
+  file: "Managed by monitors file",
+  kubernetes: "Discovered in Kubernetes",
+};
+
+/** Marks a monitor defined outside the UI, in lists. */
+export function ManagedIcon({ source }: { source: MonitorSource }) {
+  if (source === "ui") return null;
+  const Icon = source === "kubernetes" ? ShipWheel : FileCode2;
   return (
-    <span title="Defined in the monitors file" className="text-muted-foreground">
-      <FileCode2 className="size-3.5" />
+    <span title={managedLabel[source]} className="text-muted-foreground">
+      <Icon className="size-3.5" />
     </span>
   );
 }

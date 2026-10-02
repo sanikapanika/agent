@@ -27,6 +27,11 @@ type Config struct {
 
 	RetentionDays int
 
+	// KubernetesDiscovery creates monitors for resources labeled
+	// upti.my/monitor=true when running in a cluster. On by default: nothing
+	// happens until something is labeled.
+	KubernetesDiscovery bool
+
 	// UptimyHeartbeatURL pins the "Watch the watcher" check-in URL, for
 	// agents whose database doesn't survive a restart. Usually it's set up
 	// with "Connect to Uptimy" in the UI instead.
@@ -73,6 +78,9 @@ func Load() (Config, error) {
 	}
 
 	var err error
+	if c.KubernetesDiscovery, err = envBool("KUBERNETES_DISCOVERY", true); err != nil {
+		return c, err
+	}
 	if c.RetentionDays, err = envInt("RETENTION_DAYS", 30); err != nil {
 		return c, err
 	}
@@ -102,4 +110,16 @@ func envInt(key string, fallback int) (int, error) {
 		return 0, fmt.Errorf("%s: %w", key, err)
 	}
 	return n, nil
+}
+
+func envBool(key string, fallback bool) (bool, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback, nil
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", key, err)
+	}
+	return b, nil
 }

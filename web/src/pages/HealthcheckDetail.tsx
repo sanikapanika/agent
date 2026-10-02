@@ -1,3 +1,4 @@
+import { managedLabel } from "@/components/MonitorEmpty";
 import { useState } from "react";
 import { useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -62,7 +63,7 @@ export function HealthcheckDetail() {
             <Badge>{typeLabel(h.check.type)}</Badge>
             {h.target && <span className="break-all">{h.target}</span>}
             <span>· every {formatInterval(h.check.interval_seconds)}</span>
-            {h.source === "file" && <Badge>Managed by monitors file</Badge>}
+            {h.source !== "ui" && <Badge>{managedLabel[h.source]}</Badge>}
           </span>
         }
         actions={

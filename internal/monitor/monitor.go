@@ -39,6 +39,9 @@ const (
 const (
 	SourceUI   = "ui"
 	SourceFile = "file"
+	// SourceKubernetes: discovered from a labeled Service, Ingress,
+	// HTTPRoute or workload (internal/discovery).
+	SourceKubernetes = "kubernetes"
 )
 
 // Monitor is a healthcheck or a heartbeat. Exactly one of Check and

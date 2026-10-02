@@ -9,11 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 	"time"
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/uptimy/agent/internal/managed"
 	"github.com/uptimy/agent/internal/monitor"
 	"github.com/uptimy/agent/internal/store"
 )
@@ -55,12 +55,7 @@ type HeartbeatEntry struct {
 }
 
 // Desired is a monitor as the file describes it.
-type Desired struct {
-	monitor.Monitor
-	// GeneratedToken: the file didn't set the heartbeat's token, so an
-	// existing heartbeat keeps the one it has.
-	GeneratedToken bool
-}
+type Desired = managed.Desired
 
 // Parse decodes and validates YAML.
 func Parse(data []byte) ([]Desired, error) {
@@ -141,59 +136,9 @@ func seconds(s string) (int, error) {
 	return int(d.Seconds()), nil
 }
 
-// Sync makes the file-managed monitors in the store match desired, matching
-// by name, and only writes the ones that changed. Monitors created in the UI
-// are never touched. It runs at startup, before the scheduler loads monitors.
+// Sync makes the file-managed monitors in the store match desired. It runs
+// at startup, before the scheduler loads monitors.
 func Sync(ctx context.Context, st *store.Store, desired []Desired) (created, updated, deleted int, err error) {
-	existing, err := st.ListMonitors(ctx)
-	if err != nil {
-		return 0, 0, 0, err
-	}
-	byName := map[string]monitor.Monitor{}
-	for _, m := range existing {
-		if m.Source == monitor.SourceFile {
-			byName[m.Name] = m
-		}
-	}
-	for _, d := range desired {
-		cur, ok := byName[d.Name]
-		if ok && cur.Kind != d.Kind {
-			// Switched between healthcheck and heartbeat: a different monitor.
-			if err := st.DeleteMonitor(ctx, cur.ID); err != nil {
-				return created, updated, deleted, err
-			}
-			deleted++
-			ok = false
-		}
-		if !ok {
-			if _, err := st.CreateMonitor(ctx, d.Monitor); err != nil {
-				return created, updated, deleted, err
-			}
-			created++
-			continue
-		}
-		delete(byName, d.Name)
-		m := d.Monitor
-		m.ID, m.CreatedAt, m.UpdatedAt = cur.ID, cur.CreatedAt, cur.UpdatedAt
-		// The status page editor owns whether and how it's shown; the file
-		// never sets it.
-		m.Public, m.StatusLabel, m.StatusOrder, m.StatusSection = cur.Public, cur.StatusLabel, cur.StatusOrder, cur.StatusSection
-		if d.GeneratedToken {
-			m.Heartbeat.Token = cur.Heartbeat.Token // keep the ping URL
-		}
-		if reflect.DeepEqual(m, cur) {
-			continue
-		}
-		if _, err := st.UpdateMonitor(ctx, m); err != nil {
-			return created, updated, deleted, err
-		}
-		updated++
-	}
-	for _, m := range byName {
-		if err := st.DeleteMonitor(ctx, m.ID); err != nil {
-			return created, updated, deleted, err
-		}
-		deleted++
-	}
-	return created, updated, deleted, nil
+	ch, err := managed.Sync(ctx, st, monitor.SourceFile, desired, managed.Options{})
+	return ch.Created, ch.Updated, len(ch.Deleted), err
 }

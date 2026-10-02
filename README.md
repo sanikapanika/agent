@@ -74,6 +74,45 @@ heartbeats:
     timezone: Europe/Berlin
 ```
 
+#### Auto-discovery
+
+Label a Service, Ingress, Gateway API HTTPRoute, Deployment, StatefulSet or DaemonSet with `upti.my/monitor: "true"` and the agent creates a monitor for it within 30 seconds, so a new app is monitored as soon as it's deployed:
+
+| Resource | Monitor | Default name |
+| --- | --- | --- |
+| Service | HTTP check on `http://<name>.<namespace>.svc:<port>/` when the port looks like HTTP (named `http`, `https`, `web` or `http-…`, an HTTP `appProtocol`, or port 80, 443 or 8080), otherwise a TCP connect | `<namespace>/<name>` |
+| Ingress | HTTP check per hostname, over HTTPS when the Ingress has TLS for it | the hostname |
+| HTTPRoute | HTTPS check per hostname | the hostname |
+| Deployment, StatefulSet, DaemonSet | readiness check: all replicas ready | `<namespace>/<name> (<kind>)` |
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout
+  namespace: shop
+  labels:
+    upti.my/monitor: "true"
+  annotations:
+    upti.my/name: Checkout API
+    upti.my/path: /health
+```
+
+Annotations adjust what's checked:
+
+| Annotation | Applies to | Default |
+| --- | --- | --- |
+| `upti.my/name` | all | see above |
+| `upti.my/path` | Service, Ingress, HTTPRoute | `/`. On a Service it also makes the check HTTP |
+| `upti.my/port` | Service | the first port (a name or a number) |
+| `upti.my/type` | Service | `http` or `tcp`, picked from the port |
+| `upti.my/scheme` | Service, Ingress, HTTPRoute | `http` or `https`, picked as above |
+| `upti.my/interval` | all | `1m` (e.g. `30s`) |
+| `upti.my/expected-status` | HTTP checks | `200-399` |
+| `upti.my/keyword` | HTTP checks | – |
+
+Discovered monitors are read-only in the UI, marked "Discovered in Kubernetes", and follow the resource: changing an annotation updates the monitor, and removing the label or the resource deletes it. You can still pause them and add them to the status page. Catch-all and wildcard hostnames are skipped. With `rbac.clusterWide: false` the agent only looks in its own namespace; set `discovery.enabled: false` in the chart (or `KUBERNETES_DISCOVERY=false`) to turn it off.
+
 ### Railway
 
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/uptimy-agent?referralCode=-G2iM8&utm_medium=integration&utm_source=template&utm_campaign=agent-readme)
@@ -92,9 +131,10 @@ Environment variables set how the agent runs, its secrets, and (optionally) moni
 | `ADMIN_PASSWORD` | – | That admin's password (min 8 chars). If unset, a random one is printed in the log on first start and must be changed at first sign-in. Setting it later resets the password, which is also how you recover a lost admin login |
 | `MONITORS_FILE` | – | Path to a YAML file of monitors |
 | `MONITORS_YAML` | – | The YAML itself, for platforms where mounting files is awkward |
+| `KUBERNETES_DISCOVERY` | `true` | Create monitors for resources labeled `upti.my/monitor: "true"` (see [Auto-discovery](#auto-discovery)). Only applies inside a cluster |
 | `RETENTION_DAYS` | `30` | How long check results, heartbeat runs and events are kept |
 | `UPTIMY_HEARTBEAT_URL` | – | Optional. Pins the [Watch the watcher](#watch-the-watcher) heartbeat, for agents without a persistent volume; otherwise connect it in the UI |
-| `AGENT_NAME` | hostname | How this agent is labelled in Uptimy |
+| `AGENT_NAME` | hostname | How this agent is labeled in Uptimy |
 
 ### Monitors in YAML
 

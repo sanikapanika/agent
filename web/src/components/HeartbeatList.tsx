@@ -3,7 +3,7 @@ import type { HeartbeatSummary } from "@/lib/api";
 import { cn, formatUptime, timeAgo } from "@/lib/utils";
 import { monitorPath } from "@/lib/monitors";
 import { HeartbeatDot, RunBars } from "@/components/status";
-import { FileManagedIcon, MaintenanceBadge } from "@/components/MonitorEmpty";
+import { ManagedIcon, MaintenanceBadge } from "@/components/MonitorEmpty";
 
 /** Rows of heartbeats, as on the dashboard and the Heartbeats page. */
 export function HeartbeatList({ heartbeats }: { heartbeats: HeartbeatSummary[] }) {
@@ -31,7 +31,7 @@ function HeartbeatRow({ h }: { h: HeartbeatSummary }) {
         <div className="flex items-center gap-2">
           <span className="truncate font-medium">{h.name}</span>
           {h.in_maintenance && <MaintenanceBadge />}
-          {h.source === "file" && <FileManagedIcon />}
+          <ManagedIcon source={h.source} />
         </div>
         <div className="truncate text-xs text-muted-foreground">
           {h.schedule} · {h.last_run?.finished_at ? `last run ${timeAgo(h.last_run.finished_at)}` : "no run yet"}

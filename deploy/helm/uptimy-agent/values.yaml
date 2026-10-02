@@ -9,7 +9,7 @@ image:
 adminPassword: ""
 existingSecret: ""         # Secret with key ADMIN_PASSWORD
 
-# How this agent is labelled in Uptimy. Defaults to the release name
+# How this agent is labeled in Uptimy. Defaults to the release name
 # (the pod's hostname would change on every restart).
 agentName: ""
 
@@ -40,7 +40,14 @@ heartbeats: []
 
 retentionDays: 30
 
-# Read-only access to Deployments/StatefulSets/DaemonSets for kubernetes checks.
+# Create monitors for Services, Ingresses, HTTPRoutes and workloads labeled
+# upti.my/monitor: "true" (see the chart README). Nothing is monitored until
+# something is labeled.
+discovery:
+  enabled: true
+
+# Read-only access to Deployments/StatefulSets/DaemonSets for kubernetes
+# checks, plus listing labeled Services/Ingresses/HTTPRoutes for discovery.
 rbac:
   create: true
   clusterWide: true        # false: only the release namespace

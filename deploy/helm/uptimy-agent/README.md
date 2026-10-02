@@ -6,7 +6,8 @@ Open-source, self-hosted uptime monitoring that runs inside your cluster. It che
 - **Heartbeats** for CronJobs, backups and workers: an interval or a cron schedule in any time zone, with missed and failed runs, exit codes and durations.
 - **Alerts** by email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty, webhooks and Uptimy.
 - **Status page** at `/status` with your logo, sections and public names. It never shows internal hostnames.
-- **Monitors in Git:** put them in `values.yaml` and they're rendered into a ConfigMap.
+- **Auto-discovery:** label a Service, Ingress, HTTPRoute or workload with `upti.my/monitor: "true"` and it's monitored within 30 seconds.
+- **Monitors in Git:** or put them in `values.yaml` and they're rendered into a ConfigMap.
 
 [Source and docs](https://github.com/uptimy/agent) · [Live demo](https://uptimy-agent-production-b9a3.up.railway.app/status)
 
@@ -19,6 +20,22 @@ kubectl -n monitoring port-forward svc/uptimy-agent 8080:80
 ```
 
 Open http://localhost:8080 and sign in as `admin` with the password from the log. You'll choose your own straight away. Set `adminPassword` or `existingSecret` to skip that.
+
+## Auto-discovery
+
+Label what you want monitored. A Service gets an HTTP check on its cluster DNS name (or a TCP connect for ports that aren't HTTP), an Ingress or HTTPRoute an HTTP check per hostname, and a Deployment, StatefulSet or DaemonSet a readiness check. Annotations adjust it:
+
+```yaml
+metadata:
+  labels:
+    upti.my/monitor: "true"
+  annotations:
+    upti.my/name: Checkout API   # default: <namespace>/<name>
+    upti.my/path: /health        # default: /
+    upti.my/interval: 30s        # default: 1m
+```
+
+All annotations (`port`, `type`, `scheme`, `expected-status`, `keyword`) are in the [agent README](https://github.com/uptimy/agent#auto-discovery). Removing the label deletes the monitor. Discovery lists only labeled objects; turn it off with `discovery.enabled: false`.
 
 ## Monitors in values
 
@@ -71,12 +88,13 @@ ingress:
 | `image.tag` | chart `appVersion` | Image tag |
 | `adminPassword` | `""` | Password for `admin`; empty prints a random one to the log |
 | `existingSecret` | `""` | Secret with key `ADMIN_PASSWORD` instead of `adminPassword` |
-| `agentName` | release name | How the agent is labelled in Uptimy |
+| `agentName` | release name | How the agent is labeled in Uptimy |
 | `uptimy.heartbeatUrl` | `""` | Pin the Uptimy check-in URL (usually done with "Connect to Uptimy" in the UI) |
 | `uptimy.existingSecret` | `""` | Secret with key `UPTIMY_HEARTBEAT_URL` |
 | `healthchecks` / `heartbeats` | `[]` | Monitors defined in values |
 | `retentionDays` | `30` | How long check results are kept |
-| `rbac.create` | `true` | Read-only access to Deployments, StatefulSets and DaemonSets |
+| `discovery.enabled` | `true` | Monitor resources labeled `upti.my/monitor: "true"` |
+| `rbac.create` | `true` | Read-only access to Deployments, StatefulSets and DaemonSets, and listing Services, Ingresses and HTTPRoutes for discovery |
 | `rbac.clusterWide` | `true` | `false` limits that access to the release namespace |
 | `serviceAccount.create` / `.name` | `true` / `""` | Service account for Kubernetes checks |
 | `persistence.enabled` | `true` | Keep data on a PVC (SQLite) |

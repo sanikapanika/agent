@@ -32,12 +32,15 @@ export interface HeartbeatSpec {
   grace_seconds: number;
 }
 
+/** Where a monitor is defined. Only "ui" monitors are edited in the UI. */
+export type MonitorSource = "ui" | "file" | "kubernetes";
+
 export interface Monitor {
   id: number;
   kind: MonitorKind;
   name: string;
   paused: boolean;
-  source: "ui" | "file";
+  source: MonitorSource;
   // Status page placement, set in its editor.
   public: boolean;
   status_label: string;
@@ -383,7 +386,7 @@ export interface StatusPageMonitor {
   name: string;
   kind: MonitorKind;
   type_label: string;
-  source: "ui" | "file";
+  source: MonitorSource;
   public: boolean;
   label: string;
   section: string;

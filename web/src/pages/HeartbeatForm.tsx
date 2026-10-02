@@ -92,7 +92,7 @@ export function HeartbeatForm() {
   if (existing.error) return <ErrorNote error={existing.error} />;
   if (!existing.data) return null;
   const h = existing.data.heartbeat;
-  if (h.source === "file") return <Navigate to={monitorPath(h)} replace />;
+  if (h.source !== "ui") return <Navigate to={monitorPath(h)} replace />;
   return (
     <HeartbeatFormBody
       key={h.id}

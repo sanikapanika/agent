@@ -5,7 +5,7 @@ import { useCheckTypeLabel } from "@/lib/types";
 import { monitorPath } from "@/lib/monitors";
 import { Badge } from "@/components/ui/badge";
 import { ResultBars, StatusDot } from "@/components/status";
-import { FileManagedIcon, MaintenanceBadge } from "@/components/MonitorEmpty";
+import { ManagedIcon, MaintenanceBadge } from "@/components/MonitorEmpty";
 
 /** Rows of healthchecks, as on the dashboard and the Healthchecks page. */
 export function HealthcheckList({ healthchecks }: { healthchecks: HealthcheckSummary[] }) {
@@ -34,7 +34,7 @@ function HealthcheckRow({ h }: { h: HealthcheckSummary }) {
           <span className="truncate font-medium">{h.name}</span>
           <Badge>{typeLabel(h.check.type)}</Badge>
           {h.in_maintenance && <MaintenanceBadge />}
-          {h.source === "file" && <FileManagedIcon />}
+          <ManagedIcon source={h.source} />
         </div>
         <div className="truncate text-xs text-muted-foreground">{h.target}</div>
       </div>

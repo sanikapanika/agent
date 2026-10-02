@@ -120,7 +120,7 @@ func (s *Server) createHealthcheck(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateHealthcheck(w http.ResponseWriter, r *http.Request) {
 	m, ok := s.loadMonitor(w, r, monitor.KindHealthcheck)
-	if !ok || rejectFileManaged(w, m) {
+	if !ok || rejectManaged(w, m, "edit") {
 		return
 	}
 	var in healthcheckInput

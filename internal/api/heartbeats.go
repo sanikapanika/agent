@@ -140,7 +140,7 @@ func (s *Server) createHeartbeat(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateHeartbeat(w http.ResponseWriter, r *http.Request) {
 	m, ok := s.loadMonitor(w, r, monitor.KindHeartbeat)
-	if !ok || rejectFileManaged(w, m) {
+	if !ok || rejectManaged(w, m, "edit") {
 		return
 	}
 	var in heartbeatInput
@@ -155,7 +155,7 @@ func (s *Server) updateHeartbeat(w http.ResponseWriter, r *http.Request) {
 // leaked. The old URL stops working right away.
 func (s *Server) rotateToken(w http.ResponseWriter, r *http.Request) {
 	m, ok := s.loadMonitor(w, r, monitor.KindHeartbeat)
-	if !ok || rejectFileManaged(w, m) {
+	if !ok || rejectManaged(w, m, "edit") {
 		return
 	}
 	m.Heartbeat.Token = monitor.NewToken()

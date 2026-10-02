@@ -117,8 +117,7 @@ func (s *Server) deleteMonitor(kind monitor.Kind) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		if m.Source == monitor.SourceFile {
-			writeError(w, http.StatusConflict, "this is defined in the monitors file; remove it there")
+		if rejectManaged(w, m, "delete") {
 			return
 		}
 		s.Scheduler.Remove(m.ID)
@@ -131,14 +130,23 @@ func (s *Server) deleteMonitor(kind monitor.Kind) http.HandlerFunc {
 	}
 }
 
-// rejectFileManaged refuses edits to monitors defined in the monitors file,
-// which would overwrite them on the next start.
-func rejectFileManaged(w http.ResponseWriter, m monitor.Monitor) bool {
-	if m.Source == monitor.SourceFile {
+// rejectManaged refuses to edit or delete monitors defined outside the UI:
+// their source would overwrite the change (the file on the next start,
+// discovery on its next scan).
+func rejectManaged(w http.ResponseWriter, m monitor.Monitor, verb string) bool {
+	switch {
+	case m.Source == monitor.SourceFile && verb == "delete":
+		writeError(w, http.StatusConflict, "this is defined in the monitors file; remove it there")
+	case m.Source == monitor.SourceFile:
 		writeError(w, http.StatusConflict, "this is defined in the monitors file; edit it there")
-		return true
+	case m.Source == monitor.SourceKubernetes && verb == "delete":
+		writeError(w, http.StatusConflict, "this was discovered in Kubernetes; remove the upti.my/monitor label from the resource to delete it")
+	case m.Source == monitor.SourceKubernetes:
+		writeError(w, http.StatusConflict, "this was discovered in Kubernetes; change its upti.my/ annotations to edit it")
+	default:
+		return false
 	}
-	return false
+	return true
 }
 
 func (s *Server) monitorEvents(w http.ResponseWriter, r *http.Request) {

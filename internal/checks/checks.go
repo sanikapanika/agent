@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/uptimy/agent/internal/kube"
 	"github.com/uptimy/agent/internal/monitor"
 )
 
@@ -26,18 +27,18 @@ type Outcome struct {
 type Checker struct {
 	secure   *http.Client
 	insecure *http.Client
-	kube     *KubeClient // nil when not running inside Kubernetes
+	kube     *kube.Client // nil when not running inside Kubernetes
 }
 
-// New returns a Checker. kube may be nil.
-func New(kube *KubeClient) *Checker {
+// New returns a Checker. k may be nil.
+func New(k *kube.Client) *Checker {
 	mk := func(skipVerify bool) *http.Client {
 		t := http.DefaultTransport.(*http.Transport).Clone()
 		t.TLSClientConfig = &tls.Config{InsecureSkipVerify: skipVerify} //nolint:gosec // opt-in per monitor
 		t.MaxIdleConnsPerHost = 2
 		return &http.Client{Transport: t}
 	}
-	return &Checker{secure: mk(false), insecure: mk(true), kube: kube}
+	return &Checker{secure: mk(false), insecure: mk(true), kube: k}
 }
 
 // Probe checks one monitor. The context carries the monitor's timeout.

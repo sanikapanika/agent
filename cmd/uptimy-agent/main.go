@@ -18,8 +18,11 @@ import (
 	"github.com/uptimy/agent/internal/checks"
 	"github.com/uptimy/agent/internal/config"
 	"github.com/uptimy/agent/internal/connect"
+	"github.com/uptimy/agent/internal/discovery"
 	"github.com/uptimy/agent/internal/events"
 	"github.com/uptimy/agent/internal/filesync"
+	"github.com/uptimy/agent/internal/kube"
+	"github.com/uptimy/agent/internal/managed"
 	"github.com/uptimy/agent/internal/notify"
 	"github.com/uptimy/agent/internal/scheduler"
 	"github.com/uptimy/agent/internal/store"
@@ -74,15 +77,27 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
-	kube := checks.NewInClusterKubeClient()
-	if kube != nil {
+	kc := kube.NewInCluster()
+	if kc != nil {
 		log.Info("running inside Kubernetes; kubernetes monitors enabled")
 	}
 	hub := events.NewHub()
 	sender := notify.NewSender(log)
-	sched := scheduler.New(st, checks.New(kube), sender, hub, log)
+	sched := scheduler.New(st, checks.New(kc), sender, hub, log)
 	if err := sched.Start(ctx); err != nil {
 		return fmt.Errorf("start scheduler: %w", err)
+	}
+	if kc != nil && cfg.KubernetesDiscovery {
+		log.Info("kubernetes discovery enabled", "label", discovery.Label+"=true")
+		go discovery.New(kc, log).Run(ctx, st, func(ch managed.Changes) {
+			for _, id := range ch.Deleted {
+				sched.Remove(id)
+			}
+			for _, m := range ch.Saved {
+				sched.Upsert(m)
+			}
+			hub.Publish(events.Message{Type: "monitors"})
+		})
 	}
 
 	// Watch the watcher: UPTIMY_HEARTBEAT_URL wins; otherwise use the URL
@@ -101,7 +116,7 @@ func run(log *slog.Logger) error {
 
 	srv := &api.Server{
 		Config: cfg, Version: version, Store: st, Scheduler: sched,
-		Sender: sender, Hub: hub, Log: log, Watchdog: watchdog, KubeAvailable: kube != nil,
+		Sender: sender, Hub: hub, Log: log, Watchdog: watchdog, KubeAvailable: kc != nil,
 	}
 	srv.RestorePaused(ctx)
 	go watchdog.Run(ctx)
