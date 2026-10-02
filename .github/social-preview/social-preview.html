@@ -1,0 +1,67 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#000; --card:#0d0f12; --line:#1f2328; --muted:#8b949e; --text:#f0f3f6; --up:#33a36b; --brand:#0fca82; --down:#e5534b; }
+* { box-sizing:border-box; margin:0; }
+body { width:1280px; height:640px; background:var(--bg); color:var(--text); font-family:Inter,system-ui,sans-serif; overflow:hidden; position:relative; }
+.glow { position:absolute; inset:0; background:radial-gradient(700px 420px at 92% 18%, rgba(15,202,130,.16), transparent 70%), radial-gradient(600px 360px at 0% 100%, rgba(15,202,130,.08), transparent 70%); }
+.wrap { position:absolute; inset:0; padding:56px 72px 96px; display:grid; grid-template-columns:1fr 470px; gap:56px; align-items:center; }
+.logo { display:flex; align-items:center; gap:14px; }
+.logo span { font-size:30px; font-weight:600; color:var(--muted); letter-spacing:-.01em; transform:translateY(4px); }
+h1 { margin-top:30px; font-size:60px; line-height:1.05; font-weight:800; letter-spacing:-.035em; }
+h1 em { font-style:normal; color:var(--brand); }
+.facts { margin-top:30px; display:flex; flex-direction:column; gap:14px; }
+.fact { display:flex; align-items:center; gap:12px; font-size:23px; color:#c9d1d9; font-weight:500; }
+.fact b { color:var(--text); font-weight:600; }
+.fact i { width:9px; height:9px; border-radius:50%; background:var(--brand); flex-shrink:0; }
+.foot { position:absolute; left:72px; bottom:42px; font-size:20px; color:var(--muted); font-family:"JetBrains Mono",monospace; }
+.foot b { color:var(--text); font-weight:500; }
+.lic { position:absolute; right:72px; bottom:42px; font-size:18px; color:var(--muted); }
+.card { background:var(--card); border:1.5px solid var(--line); border-radius:18px; padding:22px 22px 10px; box-shadow:0 30px 80px rgba(0,0,0,.6); }
+.card h3 { font-size:15px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.08em; margin-bottom:10px; display:flex; justify-content:space-between; }
+.row { display:grid; grid-template-columns:12px 1fr auto; gap:12px; align-items:center; padding:13px 0; border-top:1px solid var(--line); }
+.row:first-of-type { border-top:none; }
+.dot { width:11px; height:11px; border-radius:50%; background:var(--up); }
+.dot.down { background:var(--down); }
+.name { font-size:18px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sub { font-size:14px; color:var(--muted); margin-top:3px; font-family:"JetBrains Mono",monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.val { font-size:15px; color:#c9d1d9; text-align:right; white-space:nowrap; }
+.val.down { color:var(--down); }
+.wheel { display:inline-block; width:14px; height:14px; margin-left:6px; vertical-align:-1px; opacity:.6; }
+</style></head><body><div class="glow"></div>
+<div class="wrap">
+  <div>
+    <div class="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="126 122 1000 218" width="300" height="65" role="img" aria-label="Uptimy"><defs>
+    <linearGradient id="w-rise" gradientUnits="userSpaceOnUse" x1="318" y1="321" x2="416" y2="141">
+      <stop offset="0.16" stop-color="#ffffff"/>
+      <stop offset="0.52" stop-color="#0fca82"/>
+    </linearGradient>
+    <linearGradient id="w-tail" gradientUnits="userSpaceOnUse" x1="440" y1="0" x2="660" y2="0">
+      <stop offset="0.55" stop-color="#0fca82"/>
+      <stop offset="1" stop-color="#0fca82" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path fill="#ffffff" d="M140.5 246.5Q230 244 272 240.5V258.5Q230 255 140.5 253.5A3.5 3.5 0 0 1 140.5 246.5Z"/>
+  <path fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" d="M272 249.5L318 321"/>
+  <path fill="none" stroke="url(#w-rise)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" d="M318 321L416 141L440 171"/>
+  <path fill="url(#w-tail)" d="M440 162Q452 165.5 480 165.5L662 163.5V172.5L480 177Q452 177 440 180Z"/><g fill="#ffffff" fill-rule="evenodd" transform="translate(0 289) skewX(-11.64)"><path d="M492.5-74H508.5V-20A4 4 0 0 0 512.5-16H555.5A4 4 0 0 0 559.5-20V-74H575.5V-17A17 17 0 0 1 558.5 0H509.5A17 17 0 0 1 492.5-17Z"/><path d="M616.5 0V-74H681.5A16 16 0 0 1 697.5-58V-41A16 16 0 0 1 681.5-25H632.5V0ZM632.5-58V-41H677.5A4 4 0 0 0 681.5-45V-54A4 4 0 0 0 677.5-58Z"/><path d="M726.5-74H805.5V-58H774.5V0H758.5V-58H726.5Z"/><path d="M837.5-74H853.5V0H837.5Z"/><path d="M892.5 0V-74H911.5L938.5-40.5L965.5-74H984.5V0H968.5V-54.2L938.5-17L908.5-54.2V0Z"/><path d="M1016.5-74H1036.5L1057.5-48.4L1078.5-74H1098.5L1065.5-33.8V0H1049.5V-33.8Z"/></g></svg>
+<span>Agent</span></div>
+    <h1>Uptime monitoring <em>inside your cluster</em></h1>
+    <div class="facts">
+      <div class="fact"><i></i><span><b>Label a Service,</b> it's monitored</span></div>
+      <div class="fact"><i></i><span><b>CronJobs without pings,</b> exit codes included</span></div>
+      <div class="fact"><i></i><span><b>9 MB image, 8 MiB RAM.</b> Docker and Railway too</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3><span>Discovered in Kubernetes</span><span>30s ago</span></h3>
+    <div class="row"><div class="dot"></div><div><div class="name">Checkout API</div><div class="sub">service shop/checkout · /healthz</div></div><div class="val">200 OK · 3ms</div></div>
+    <div class="row"><div class="dot"></div><div><div class="name">Orders database</div><div class="sub">postgres · SELECT 1</div></div><div class="val">query ok</div></div>
+    <div class="row"><div class="dot"></div><div><div class="name">shop/checkout (deployment)</div><div class="sub">readiness</div></div><div class="val">3/3 ready</div></div>
+    <div class="row"><div class="dot"></div><div><div class="name">Nightly backup</div><div class="sub">cronjob shop/backup · 0 3 * * *</div></div><div class="val">on time · 19s</div></div>
+    <div class="row"><div class="dot down"></div><div><div class="name">Product export</div><div class="sub">cronjob shop/export</div></div><div class="val down">exit 137 OOMKilled</div></div>
+  </div>
+</div>
+<div class="foot"><b>github.com/uptimy/agent</b></div>
+<div class="lic">Open source · Apache-2.0</div>
+</body></html>
