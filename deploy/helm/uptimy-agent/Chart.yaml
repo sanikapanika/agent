@@ -2,12 +2,29 @@ apiVersion: v2
 name: uptimy-agent
 description: Self-hosted uptime monitoring with status pages, running inside your cluster.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+# The chart is released with the agent: CI sets both versions from the tag.
+version: 0.1.1
+appVersion: "0.1.1"
+kubeVersion: ">=1.25.0-0"
 home: https://github.com/uptimy/agent
+icon: https://www.upti.my/brand/uptimy-app-icon.svg
 sources:
   - https://github.com/uptimy/agent
-keywords: [uptime, monitoring, status-page, healthcheck, kubernetes]
+keywords: [uptime, monitoring, status-page, healthcheck, heartbeat, cron, kubernetes, uptime-kuma]
 maintainers:
   - name: Uptimy
     url: https://www.upti.my
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/category: monitoring-logging
+  artifacthub.io/links: |
+    - name: Source
+      url: https://github.com/uptimy/agent
+    - name: Live demo
+      url: https://uptimy-agent-production-b9a3.up.railway.app/status
+    - name: Uptimy
+      url: https://www.upti.my
+  artifacthub.io/images: |
+    - name: agent
+      image: ghcr.io/uptimy/agent:0.1.1
+      platforms: [linux/amd64, linux/arm64]

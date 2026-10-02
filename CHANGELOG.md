@@ -4,6 +4,10 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Added
+- The Helm chart is published with each release: `helm install uptimy-agent oci://ghcr.io/uptimy/charts/uptimy-agent`, at the same version as the agent, and listed on Artifact Hub.
+- Images and charts are signed with cosign (keyless, from CI).
+
 ## [0.1.1] - 2026-10-01
 
 ### Fixed

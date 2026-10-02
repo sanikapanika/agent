@@ -1,0 +1,7 @@
+# Artifact Hub metadata for oci://ghcr.io/uptimy/charts/uptimy-agent.
+# CI pushes it as the chart's `artifacthub.io` tag on every release.
+# Add `repositoryID` (from the repository's page on Artifact Hub) to get the
+# "Verified publisher" badge.
+owners:
+  - name: Uptimy
+    email: ajdin.halac@upti.my

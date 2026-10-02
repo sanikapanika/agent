@@ -1,0 +1,32 @@
+# Used by CI to render the chart with every optional part switched on.
+adminPassword: ci-only
+uptimy:
+  heartbeatUrl: https://heartbeat.example.com/ping/ci
+healthchecks:
+  - name: Checkout API
+    type: http
+    target: http://checkout.shop.svc.cluster.local:8080/health
+    interval: 30s
+  - name: Checkout deployment
+    type: kubernetes
+    target: shop/deployment/checkout
+heartbeats:
+  - name: Nightly backup
+    cron: "0 3 * * *"
+    timezone: Europe/Berlin
+    grace: 30m
+rbac:
+  clusterWide: false
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: status.example.com
+      paths: ["/"]
+  tls:
+    - secretName: status-tls
+      hosts: [status.example.com]
+extraEnv:
+  - name: PG_PASSWORD
+    valueFrom:
+      secretKeyRef: { name: postgres-monitor, key: password }

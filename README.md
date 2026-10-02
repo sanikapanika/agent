@@ -51,9 +51,11 @@ See [`docker-compose.yml`](docker-compose.yml).
 ### Kubernetes (Helm)
 
 ```bash
-helm install uptimy-agent ./deploy/helm/uptimy-agent -n monitoring --create-namespace
+helm install uptimy-agent oci://ghcr.io/uptimy/charts/uptimy-agent -n monitoring --create-namespace
 kubectl -n monitoring port-forward svc/uptimy-agent 8080:80
 ```
+
+The chart is released with the agent, at the same version, and signed with cosign. Its values are documented in the [chart README](deploy/helm/uptimy-agent/README.md).
 
 Inside a cluster the agent uses its service account to check Deployments, StatefulSets and DaemonSets. The chart creates a read-only role for that. Monitors can live in `values.yaml`:
 
