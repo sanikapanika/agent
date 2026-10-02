@@ -182,19 +182,29 @@ function HeartbeatFormBody({ editing, initial }: { editing: number | null; initi
           ))}
         </div>
 
-        {form.mode === "every" ? (
-          <Field label="Runs every" htmlFor="every" hint="The first run is due one interval after you save.">
-            <DurationSlider
-              id="every"
-              steps={intervalSteps}
-              marks={intervalMarks}
-              value={form.every}
-              onChange={(v) => set("every", v)}
-              units={["minutes", "hours", "days"]}
-            />
-          </Field>
-        ) : (
-          <>
+        {/* Both schedules share one grid cell and only the chosen one shows, so
+            the cell is as tall as the taller one and switching moves nothing.
+            The hidden one is disabled: not focusable, not validated, not sent. */}
+        <div className="grid">
+          <fieldset
+            disabled={form.mode !== "every"}
+            className={cn("col-start-1 row-start-1 min-w-0", form.mode !== "every" && "invisible")}
+          >
+            <Field label="Runs every" htmlFor="every" hint="The first run is due one interval after you save.">
+              <DurationSlider
+                id="every"
+                steps={intervalSteps}
+                marks={intervalMarks}
+                value={form.every}
+                onChange={(v) => set("every", v)}
+                units={["minutes", "hours", "days"]}
+              />
+            </Field>
+          </fieldset>
+          <fieldset
+            disabled={form.mode !== "cron"}
+            className={cn("col-start-1 row-start-1 flex min-w-0 flex-col gap-4", form.mode !== "cron" && "invisible")}
+          >
             <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <Field
                 label="Cron expression"
@@ -235,8 +245,8 @@ function HeartbeatFormBody({ editing, initial }: { editing: number | null; initi
                 </button>
               ))}
             </div>
-          </>
-        )}
+          </fieldset>
+        </div>
 
         <SchedulePreview spec={toSpec(form)} />
       </fieldset>
