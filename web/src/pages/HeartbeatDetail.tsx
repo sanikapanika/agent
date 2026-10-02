@@ -1,5 +1,4 @@
-import { managedLabel } from "@/components/MonitorEmpty";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRound } from "lucide-react";
@@ -14,6 +13,7 @@ import { CopyField } from "@/components/ui/copy-button";
 import { ErrorNote, PageHeader } from "@/components/Layout";
 import { DailyBars, HeartbeatDot, HeartbeatStateLabel, RunBars, runOutcome, runTime } from "@/components/status";
 import { BackLink, EventsCard, MonitorActions, Stat } from "@/components/MonitorPage";
+import { managedLabel } from "@/components/MonitorEmpty";
 import { useCanEdit } from "@/components/AuthGate";
 
 export function HeartbeatDetail() {
@@ -63,7 +63,7 @@ export function HeartbeatDetail() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        {h.source === "kubernetes" ? <CronJobRunsNote /> : <PingCard h={h} />}
+        {h.source === "kubernetes" ? <CronJobRunsCard h={h} /> : <PingCard h={h} />}
         <ScheduleCard h={h} upcoming={upcoming} />
       </div>
 
@@ -247,16 +247,39 @@ function PingCard({ h }: { h: HeartbeatSummary }) {
 }
 
 /** A discovered CronJob's runs come from its Jobs, so there's nothing to ping. */
-function CronJobRunsNote() {
+function CronJobRunsCard({ h }: { h: HeartbeatSummary }) {
+  const grace = formatDuration(h.heartbeat.grace_seconds * 1000);
+  const rows: [string, string][] = [
+    ["Job starts", "A run starts, so its duration is measured."],
+    ["Job completes", "The run succeeded."],
+    ["Job fails", "The run failed, with the reason and the container's exit code (OOMKilled, exit code 1, ...)."],
+    ["No Job finishes", `If no run has finished ${grace} after it was due, it's missed.`],
+    ["CronJob suspended", "The heartbeat is paused until the CronJob is resumed."],
+  ];
   return (
     <Card>
       <CardHeader>
         <CardTitle>Runs from Kubernetes</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          The agent reads this CronJob&apos;s Jobs: when each one started, whether it completed or failed, and why. The
-          job doesn&apos;t need to ping anything.
+          The agent reads this CronJob&apos;s Jobs every 10 seconds and records each run at the times Kubernetes saw.
+          The job doesn&apos;t need to ping anything.
         </p>
       </CardHeader>
+      <CardContent className="flex flex-col gap-5">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+          {rows.map(([when, what]) => (
+            <Fragment key={when}>
+              <dt className="font-medium whitespace-nowrap">{when}</dt>
+              <dd className="text-muted-foreground">{what}</dd>
+            </Fragment>
+          ))}
+        </dl>
+        <p className="text-sm text-muted-foreground">
+          The schedule and time zone come from the CronJob. Set the grace period with the{" "}
+          <code className="font-mono text-xs">upti.my/grace</code> annotation, e.g.{" "}
+          <code className="font-mono text-xs">upti.my/grace: 30m</code>.
+        </p>
+      </CardContent>
     </Card>
   );
 }
@@ -320,6 +343,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 /** The latest runs: when, how it went, how long it took, and what the job said. */
 function RunsCard({ id }: { id: number }) {
   const runs = useQuery({ queryKey: ["heartbeat", id, "runs"], queryFn: () => api.runs(id, 50) });
+  const [shown, setShown] = useState(10);
+  // The API returns them oldest first, for the bars; the table leads with the newest.
+  const newest = [...(runs.data ?? [])].reverse();
   return (
     <Card className="mt-6">
       <CardHeader>
@@ -327,7 +353,7 @@ function RunsCard({ id }: { id: number }) {
       </CardHeader>
       <CardContent>
         <ErrorNote error={runs.error} />
-        {runs.data?.length ? (
+        {newest.length ? (
           <div className="-mx-2 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -339,7 +365,7 @@ function RunsCard({ id }: { id: number }) {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {runs.data.map((r) => {
+                {newest.slice(0, shown).map((r) => {
                   const { label, color } = runOutcome(r);
                   return (
                     <tr key={r.id}>
@@ -361,6 +387,13 @@ function RunsCard({ id }: { id: number }) {
                 })}
               </tbody>
             </table>
+            {newest.length > shown && (
+              <div className="mt-3 px-2">
+                <Button variant="outline" size="sm" onClick={() => setShown((n) => n + 10)}>
+                  Show more
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           runs.isSuccess && <p className="text-sm text-muted-foreground">No runs yet. Ping the URL to record one.</p>

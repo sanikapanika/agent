@@ -227,7 +227,9 @@ func (t *heartbeatTracker) run(ctx context.Context) {
 func (t *heartbeatTracker) publish() {
 	due := t.h.NextDue(t.anchor)
 	st := HeartbeatStatus{State: t.state, DueAt: due, Deadline: due.Add(t.h.Grace())}
-	if t.state == monitor.StateOnTime && !now().Before(due) {
+	// Past due is late, unless the run has started: it's running, and only
+	// counts as missed if it hasn't finished by the deadline.
+	if t.state == monitor.StateOnTime && !now().Before(due) && t.open == nil {
 		st.State = monitor.StateLate
 	}
 	if t.open != nil {

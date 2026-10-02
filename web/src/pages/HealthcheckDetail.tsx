@@ -1,4 +1,3 @@
-import { managedLabel } from "@/components/MonitorEmpty";
 import { useState } from "react";
 import { useParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorNote, PageHeader } from "@/components/Layout";
 import { ResultBars, StatusDot, StatusLabel } from "@/components/status";
 import { BackLink, EventsCard, MonitorActions, Stat } from "@/components/MonitorPage";
+import { managedLabel } from "@/components/MonitorEmpty";
 
 const ranges = [
   { hours: 1, label: "1h" },
