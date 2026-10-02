@@ -4,14 +4,16 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-02
+
 ### Added
 - Kubernetes auto-discovery: label a Service, Ingress, Gateway API HTTPRoute, Deployment, StatefulSet or DaemonSet with `upti.my/monitor: "true"` and the agent monitors it within 30 seconds. `upti.my/` annotations set the name, path, port, interval and more. Discovered monitors are read-only in the UI and are removed with the label. On by default in the chart (`discovery.enabled`), which now lets the agent list those resources.
+- The Helm chart is published with each release: `helm install uptimy-agent oci://ghcr.io/uptimy/charts/uptimy-agent`, at the same version as the agent, and listed on Artifact Hub.
+- Images and charts are signed with cosign (keyless, from CI).
 
 ## [0.1.2] - 2026-10-02
 
-### Added
-- The Helm chart is published with each release: `helm install uptimy-agent oci://ghcr.io/uptimy/charts/uptimy-agent`, at the same version as the agent, and listed on Artifact Hub.
-- Images and charts are signed with cosign (keyless, from CI).
+Not published: the release build failed before the image and chart were pushed. Use 0.1.3.
 
 ## [0.1.1] - 2026-10-01
 
@@ -45,7 +47,8 @@ First public release.
 - API tokens (full or read-only) for scripts and CI.
 - Import monitors and notifications from Uptime Kuma (`kuma.db`), with a review step.
 
-[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/uptimy/agent/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/uptimy/agent/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/uptimy/agent/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/uptimy/agent/releases/tag/v0.1.0
