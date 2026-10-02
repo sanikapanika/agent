@@ -26,6 +26,7 @@ type object struct {
 	Metadata struct {
 		Name        string            `json:"name"`
 		Namespace   string            `json:"namespace"`
+		UID         string            `json:"uid"`
 		Annotations map[string]string `json:"annotations"`
 	} `json:"metadata"`
 	Spec json.RawMessage `json:"spec"`
@@ -34,7 +35,7 @@ type object struct {
 // options are the annotations, parsed.
 type options struct {
 	name, path, port, typ, scheme string
-	interval                      int
+	interval, grace               int // seconds
 	expectedStatus, keyword       string
 }
 
@@ -44,12 +45,14 @@ func parseOptions(o object) (options, error) {
 		name: a("name"), path: a("path"), port: a("port"), typ: a("type"), scheme: a("scheme"),
 		expectedStatus: a("expected-status"), keyword: a("keyword"),
 	}
-	if v := a("interval"); v != "" {
-		d, err := time.ParseDuration(v)
-		if err != nil {
-			return opts, fmt.Errorf("%s/interval: %w", prefix, err)
+	for key, dst := range map[string]*int{"interval": &opts.interval, "grace": &opts.grace} {
+		if v := a(key); v != "" {
+			d, err := time.ParseDuration(v)
+			if err != nil {
+				return opts, fmt.Errorf("%s/%s: %w", prefix, key, err)
+			}
+			*dst = int(d.Seconds())
 		}
-		opts.interval = int(d.Seconds())
 	}
 	if opts.path != "" && !strings.HasPrefix(opts.path, "/") {
 		opts.path = "/" + opts.path
@@ -278,4 +281,64 @@ func fromWorkload(kind string) func(*Discoverer, context.Context, object) ([]mon
 		target := o.Metadata.Namespace + "/" + kind + "/" + o.Metadata.Name
 		return []monitor.Monitor{healthcheck(name, &monitor.Check{Type: monitor.TypeKubernetes, Target: target, IntervalSeconds: opts.interval})}, nil
 	}
+}
+
+// fromCronJob makes a heartbeat on the CronJob's schedule. Its runs are
+// read from the CronJob's Jobs (see jobs.go), so the job needs no ping.
+func fromCronJob(_ *Discoverer, _ context.Context, o object) ([]monitor.Monitor, error) {
+	opts, err := parseOptions(o)
+	if err != nil {
+		return nil, err
+	}
+	if opts.typ != "" && opts.typ != "heartbeat" {
+		return nil, fmt.Errorf("%s/type can only be heartbeat here", prefix)
+	}
+	var spec struct {
+		Schedule    string  `json:"schedule"`
+		TimeZone    *string `json:"timeZone"`
+		Suspend     bool    `json:"suspend"`
+		JobTemplate struct {
+			Spec struct {
+				ActiveDeadlineSeconds *int `json:"activeDeadlineSeconds"`
+			} `json:"spec"`
+		} `json:"jobTemplate"`
+	}
+	if err := json.Unmarshal(o.Spec, &spec); err != nil {
+		return nil, err
+	}
+	name := opts.name
+	if name == "" {
+		name = fmt.Sprintf("%s/%s (cronjob)", o.Metadata.Namespace, o.Metadata.Name)
+	}
+	h := monitor.Heartbeat{Token: monitor.NewToken(), Cron: spec.Schedule, Timezone: "UTC"}
+	if spec.TimeZone != nil && *spec.TimeZone != "" {
+		h.Timezone = *spec.TimeZone
+	}
+	h.GraceSeconds = opts.grace
+	if h.GraceSeconds == 0 {
+		h.GraceSeconds = cronJobGrace(h, spec.JobTemplate.Spec.ActiveDeadlineSeconds)
+	}
+	return []monitor.Monitor{{Kind: monitor.KindHeartbeat, Name: name, Paused: spec.Suspend, Heartbeat: &h}}, nil
+}
+
+// cronJobGrace is how long after its scheduled time a run may finish. A
+// run is only done when its Job completes, so the default leaves time for
+// the job itself: until Kubernetes would stop it (activeDeadlineSeconds), or
+// else until the next run is due (the shortest gap between runs), at most
+// an hour.
+func cronJobGrace(h monitor.Heartbeat, activeDeadline *int) int {
+	if activeDeadline != nil && *activeDeadline > 0 {
+		return *activeDeadline + 60 // plus a minute to start the pod
+	}
+	// The shortest gap over the next runs, so an irregular schedule (every
+	// 20 minutes during the day) gets the same grace on every scan.
+	runs := h.Upcoming(time.Now(), 20)
+	if len(runs) < 2 {
+		return 0 // an invalid schedule; Normalize reports it
+	}
+	gap := time.Hour
+	for i := 1; i < len(runs); i++ {
+		gap = min(gap, runs[i].Sub(runs[i-1]))
+	}
+	return int(max(gap, time.Minute).Seconds())
 }

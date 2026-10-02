@@ -5,6 +5,8 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 ## [Unreleased]
 
 ### Added
+- CronJobs without pings: label a CronJob `upti.my/monitor: "true"` and the agent creates a heartbeat on its schedule and time zone, and records each run from the CronJob's Jobs at the times Kubernetes saw them: start, finish, duration, and for a failure the reason with the container's exit code. Missed runs are detected from the schedule. Suspending the CronJob pauses the heartbeat. `upti.my/grace` sets how long after its scheduled time a run may finish (default: the Job's `activeDeadlineSeconds` plus a minute, or else the time between runs, at most an hour).
+- A "More services (Shoutrrr)" alert channel: one URL reaches any of 30+ services, including Pushover, Gotify, Matrix, Google Chat, Mattermost, Rocket.Chat, Opsgenie, Signal, Zulip and Home Assistant. Errors never repeat the URL or its credentials.
 - Discovered Services are checked on their pods' readinessProbe path (and scheme) instead of `/`, and ports with an HTTP readinessProbe get an HTTP check even when they don't look like HTTP.
 - Kubernetes Service checks (`<namespace>/service/<name>`): up while the Service has a ready endpoint, reusing the pods' readinessProbes with no traffic to the app. Discovery uses them for Services annotated `upti.my/type: kubernetes`.
 - The chart lets the agent read Services and EndpointSlices, and list pods when discovery is on.

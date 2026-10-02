@@ -265,3 +265,33 @@ func TestPauseStopsRunner(t *testing.T) {
 		t.Fatal("a paused healthcheck accepted a check")
 	}
 }
+
+// Report records runs at the times they happened, e.g. a CronJob's Job
+// read a few seconds after it finished.
+func TestHeartbeatReport(t *testing.T) {
+	f := newFixture(t)
+	m := f.create(t, monitor.Monitor{Kind: monitor.KindHeartbeat, Name: "cron", Heartbeat: &monitor.Heartbeat{
+		Token: "tok-report", EverySeconds: 3600, GraceSeconds: 300,
+	}})
+	start := now().Add(-3 * time.Second)
+	end := start.Add(1500 * time.Millisecond)
+	f.sched.Report(m.ID, SignalStart, start, "")
+	f.sched.Report(m.ID, SignalSuccess, end, "Job cron-1 completed")
+	eventually(t, "on time", func() bool { return f.sched.Heartbeat(m).State == monitor.StateOnTime })
+	last, err := f.store.LastRun(context.Background(), m.ID)
+	if err != nil || !last.StartedAt.Equal(start) || !last.FinishedAt.Equal(end) || *last.DurationMS != 1500 || last.Message != "Job cron-1 completed" {
+		t.Fatalf("run not recorded at the reported times: %+v %v", last, err)
+	}
+
+	// A run that finished within its grace period but was only seen after
+	// it was marked missed counts as on time.
+	fast := f.create(t, fastHeartbeat("tok-report-fast"))
+	f.sched.Ping("tok-report-fast", SignalSuccess, "")
+	eventually(t, "missed", func() bool { return f.sched.Heartbeat(fast).State == monitor.StateMissed })
+	missed, _ := f.store.LastRun(context.Background(), fast.ID)
+	f.sched.Report(fast.ID, SignalSuccess, missed.DueAt.Add(500*time.Millisecond), "")
+	eventually(t, "on time", func() bool { return f.sched.Heartbeat(fast).State == monitor.StateOnTime })
+	if run, _ := f.store.LastRun(context.Background(), fast.ID); run.ID != missed.ID || !run.OnTime || run.Outcome != monitor.OutcomeSuccess {
+		t.Fatalf("the missed run should be on time after all: %+v", run)
+	}
+}

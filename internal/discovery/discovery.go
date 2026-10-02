@@ -48,6 +48,7 @@ var resources = []resource{
 	{"deployment", "/apis/apps/v1", "deployments", fromWorkload("deployment")},
 	{"statefulset", "/apis/apps/v1", "statefulsets", fromWorkload("statefulset")},
 	{"daemonset", "/apis/apps/v1", "daemonsets", fromWorkload("daemonset")},
+	{"cronjob", "/apis/batch/v1", "cronjobs", fromCronJob},
 }
 
 // Discoverer scans the cluster for labeled resources.
@@ -63,6 +64,9 @@ type Discoverer struct {
 	// When an object's annotations stop being valid, its monitors stay as
 	// they were instead of being deleted with their history.
 	built map[string][]monitor.Monitor
+	// cronJobs are the discovered CronJobs, whose Jobs report runs.
+	cronJobs []cronJobRef
+	jobs     jobTracker
 
 	// namespaced: listing this resource cluster-wide was forbidden (the
 	// chart's rbac.clusterWide=false), so only the agent's namespace is
@@ -78,6 +82,7 @@ func New(k *kube.Client, log *slog.Logger) *Discoverer {
 	return &Discoverer{
 		kube: k, log: log,
 		probes: map[string]probe{}, built: map[string][]monitor.Monitor{},
+		jobs:       jobTracker{seen: map[string]*seenJob{}, since: map[int64]time.Time{}},
 		namespaced: map[string]bool{}, warned: map[string]bool{},
 	}
 }
@@ -94,6 +99,7 @@ func (d *Discoverer) Discover(ctx context.Context) ([]managed.Desired, error) {
 	var out []managed.Desired
 	seen := map[string]string{}             // monitor name → resource it came from
 	built := map[string][]monitor.Monitor{} // replaces d.built once the scan completes
+	var cronJobs []cronJobRef
 	for _, r := range resources {
 		items, err := d.list(ctx, r)
 		if err != nil {
@@ -123,18 +129,31 @@ func (d *Discoverer) Discover(ctx context.Context) ([]managed.Desired, error) {
 				d.warn(fmt.Sprintf("%s: %s; keeping its monitor as it was", from, err))
 				ms = prev
 			}
+			prev := d.built[from]
 			built[from] = ms
-			for _, m := range ms {
+			for i, m := range ms {
 				if other, dup := seen[m.Name]; dup {
 					d.warn(fmt.Sprintf("%s: %s also wants the name %q; set %s/name on one of them", from, other, m.Name, prefix))
 					continue
 				}
 				seen[m.Name] = from
-				out = append(out, managed.Desired{Monitor: m})
+				ds := managed.Desired{Monitor: m, GeneratedToken: m.Kind == monitor.KindHeartbeat}
+				// A suspended CronJob pauses its heartbeat, and resuming it
+				// resumes the heartbeat. Otherwise a pause set in the UI stays.
+				switch {
+				case m.Paused:
+					ds.SetPaused = &m.Paused
+				case i < len(prev) && prev[i].Paused:
+					ds.SetPaused = &m.Paused
+				}
+				out = append(out, ds)
+				if r.kind == "cronjob" {
+					cronJobs = append(cronJobs, cronJobRef{namespace: o.Metadata.Namespace, name: o.Metadata.Name, uid: o.Metadata.UID, monitor: m.Name})
+				}
 			}
 		}
 	}
-	d.built = built
+	d.built, d.cronJobs = built, cronJobs
 	return out, nil
 }
 
@@ -180,33 +199,40 @@ func (d *Discoverer) warn(msg string) {
 	}
 }
 
-// Run scans every Interval until ctx ends, syncs the discovered monitors
-// into the store and passes what changed to apply (to restart checks and
-// refresh the UI).
-func (d *Discoverer) Run(ctx context.Context, st *store.Store, apply func(managed.Changes)) {
+// Run scans the cluster every Interval until ctx ends, syncs the
+// discovered monitors into the store and passes what changed to apply (to
+// restart checks and refresh the UI). Every JobInterval it reads the
+// discovered CronJobs' Jobs and reports their runs.
+func (d *Discoverer) Run(ctx context.Context, st *store.Store, apply func(managed.Changes), report Report) {
 	failing := false
-	for {
-		desired, err := d.Discover(ctx)
-		if err == nil {
-			var ch managed.Changes
-			ch, err = managed.Sync(ctx, st, monitor.SourceKubernetes, desired, managed.Options{KeepPaused: true})
-			if !ch.Empty() {
-				d.log.Info("kubernetes discovery applied", "created", ch.Created, "updated", ch.Updated, "deleted", len(ch.Deleted))
-				apply(ch)
+	scanEvery := int(Interval / JobInterval)
+	for tick := 0; ; tick++ {
+		if tick%scanEvery == 0 {
+			desired, err := d.Discover(ctx)
+			if err == nil {
+				var ch managed.Changes
+				ch, err = managed.Sync(ctx, st, monitor.SourceKubernetes, desired, managed.Options{KeepPaused: true})
+				if !ch.Empty() {
+					d.log.Info("kubernetes discovery applied", "created", ch.Created, "updated", ch.Updated, "deleted", len(ch.Deleted))
+					apply(ch)
+				}
+			}
+			switch {
+			case err != nil && ctx.Err() == nil && !failing:
+				d.log.Warn("kubernetes discovery failed; keeping the monitors it found before", "err", err)
+				failing = true
+			case err == nil && failing:
+				d.log.Info("kubernetes discovery recovered")
+				failing = false
 			}
 		}
-		switch {
-		case err != nil && ctx.Err() == nil && !failing:
-			d.log.Warn("kubernetes discovery failed; keeping the monitors it found before", "err", err)
-			failing = true
-		case err == nil && failing:
-			d.log.Info("kubernetes discovery recovered")
-			failing = false
+		if err := d.trackJobs(ctx, st, report); err != nil && ctx.Err() == nil {
+			d.log.Warn("kubernetes discovery: reading CronJob runs", "err", err)
 		}
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(Interval):
+		case <-time.After(JobInterval):
 		}
 	}
 }

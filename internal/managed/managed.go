@@ -18,6 +18,9 @@ type Desired struct {
 	// GeneratedToken: the source didn't set the heartbeat's token, so an
 	// existing heartbeat keeps the one it has.
 	GeneratedToken bool
+	// SetPaused, with KeepPaused, pauses or resumes the monitor anyway: the
+	// source changed state (a CronJob was suspended or resumed).
+	SetPaused *bool
 }
 
 // Options say which settings the source leaves to the UI.
@@ -79,6 +82,9 @@ func Sync(ctx context.Context, st *store.Store, source string, desired []Desired
 		m.Public, m.StatusLabel, m.StatusOrder, m.StatusSection = cur.Public, cur.StatusLabel, cur.StatusOrder, cur.StatusSection
 		if opts.KeepPaused {
 			m.Paused = cur.Paused
+			if d.SetPaused != nil {
+				m.Paused = *d.SetPaused
+			}
 		}
 		if d.GeneratedToken {
 			m.Heartbeat.Token = cur.Heartbeat.Token // keep the ping URL

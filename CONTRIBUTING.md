@@ -112,6 +112,8 @@ The `Message` is shown in the UI and in alerts: make failures say what went wron
 
 ## Adding a notification channel
 
+Check the [Shoutrrr services](https://shoutrrr.nickfedor.com/latest/services/overview/) first: anything there already works through the "More services (Shoutrrr)" channel. A native channel is worth it when it does more, like PagerDuty resolving incidents or richer formatting.
+
 One file, `internal/notify/<channel>.go`:
 
 ```go

@@ -63,7 +63,7 @@ export function HeartbeatDetail() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <PingCard h={h} />
+        {h.source === "kubernetes" ? <CronJobRunsNote /> : <PingCard h={h} />}
         <ScheduleCard h={h} upcoming={upcoming} />
       </div>
 
@@ -242,6 +242,21 @@ function PingCard({ h }: { h: HeartbeatSummary }) {
           <p className="mt-2 text-xs text-muted-foreground">{ex.note}</p>
         </div>
       </CardContent>
+    </Card>
+  );
+}
+
+/** A discovered CronJob's runs come from its Jobs, so there's nothing to ping. */
+function CronJobRunsNote() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Runs from Kubernetes</CardTitle>
+        <p className="mt-1 text-sm text-muted-foreground">
+          The agent reads this CronJob&apos;s Jobs: when each one started, whether it completed or failed, and why. The
+          job doesn&apos;t need to ping anything.
+        </p>
+      </CardHeader>
     </Card>
   );
 }

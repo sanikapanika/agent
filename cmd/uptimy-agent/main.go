@@ -97,7 +97,7 @@ func run(log *slog.Logger) error {
 				sched.Upsert(m)
 			}
 			hub.Publish(events.Message{Type: "monitors"})
-		})
+		}, sched.Report)
 	}
 
 	// Watch the watcher: UPTIMY_HEARTBEAT_URL wins; otherwise use the URL

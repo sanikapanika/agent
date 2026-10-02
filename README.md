@@ -20,14 +20,14 @@
 
 ---
 
-Uptimy Agent watches your websites, APIs, databases, DNS, TLS certificates, cron jobs and Kubernetes workloads, alerts you by email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty or webhooks, and publishes a public status page.
+Uptimy Agent watches your websites, APIs, databases, DNS, TLS certificates, cron jobs and Kubernetes workloads, alerts you by email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty, webhooks or any of 30+ more services, and publishes a public status page.
 
 Because it runs next to your services, it can check things that external monitors can't reach: `postgres.default.svc:5432`, `api.railway.internal`, a Deployment's ready replicas.
 
 - **Healthchecks:** HTTP(S) with status and keyword assertions, Postgres, MySQL and Redis (real logins and queries, not just an open port), ping, TCP, DNS, TLS expiry and Kubernetes workloads
-- **Heartbeats:** cron jobs, backups and workers ping a URL when they run. Schedules are an interval or a cron expression in any time zone; you see on-time rate, missed and failed runs, exit codes and how long each run took, and you're alerted when a run is missed or fails
+- **Heartbeats:** cron jobs, backups and workers ping a URL when they run, or, for a Kubernetes CronJob, nothing at all: the agent reads its Jobs. Schedules are an interval or a cron expression in any time zone; you see on-time rate, missed and failed runs, exit codes and how long each run took, and you're alerted when a run is missed or fails
 - **Dashboard:** both at a glance, split into Healthchecks and Heartbeats like in Uptimy
-- **Alerts:** email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty, webhooks and Uptimy (alerts become incidents there, which can run workflows), fired on down and on recovery, with a consecutive-failure threshold to avoid flapping. Each channel alerts for every monitor or only the ones you choose
+- **Alerts:** email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty, webhooks, Uptimy (alerts become incidents there, which can run workflows), and 30+ more services through one [Shoutrrr](https://shoutrrr.nickfedor.com/latest/services/overview/) URL (Pushover, Gotify, Matrix, Google Chat, Mattermost, Opsgenie, Signal, ...), fired on down and on recovery, with a consecutive-failure threshold to avoid flapping. Each channel alerts for every monitor or only the ones you choose
 - **Maintenance windows:** planned work doesn't page anyone, and is announced on the status page. A monitor that's still down when the window ends alerts then
 - **Status page:** public, at `/status`. Admins set a logo (with an optional dark-mode version), accent color and website link, create sections and drag monitors into order with public names, with a live preview, much like the Uptimy app. New monitors stay off the page until you add them. It shows names with uptime (healthchecks) or on-time runs (heartbeats) only, never internal hostnames
 - **GitOps-friendly:** define monitors in YAML (a file, a ConfigMap or an env var), or click them together in the UI. Script everything else with [API tokens](#api)
@@ -88,6 +88,7 @@ Label a Service, Ingress, Gateway API HTTPRoute, Deployment, StatefulSet or Daem
 | Ingress | HTTP check per hostname, over HTTPS when the Ingress has TLS for it | the hostname |
 | HTTPRoute | HTTPS check per hostname | the hostname |
 | Deployment, StatefulSet, DaemonSet | readiness check: all replicas ready | `<namespace>/<name> (<kind>)` |
+| CronJob | heartbeat on its schedule and time zone, with runs read from its Jobs (see below) | `<namespace>/<name> (cronjob)` |
 
 ```yaml
 apiVersion: v1
@@ -113,9 +114,12 @@ Annotations adjust what's checked:
 | `upti.my/port` | Service | the first port (a name or a number) |
 | `upti.my/type` | Service | `http`, `tcp` or `kubernetes`; picked as above |
 | `upti.my/scheme` | Service, Ingress, HTTPRoute | `http` or `https`, picked as above |
-| `upti.my/interval` | all | `1m` (e.g. `30s`) |
+| `upti.my/interval` | all but CronJobs | `1m` (e.g. `30s`) |
+| `upti.my/grace` | CronJob | the Job's `activeDeadlineSeconds` plus a minute, or else the time between runs, at most `1h` |
 | `upti.my/expected-status` | HTTP checks | `200-399` |
 | `upti.my/keyword` | HTTP checks | – |
+
+**CronJobs need no ping.** The agent reads each discovered CronJob's Jobs every 10 seconds and records every run at the times Kubernetes saw: when the Job started, when it completed or failed, and for a failure the reason with the container's exit code (`BackoffLimitExceeded; container backup exited with code 137 (OOMKilled)`). Missed runs come from the schedule as for any heartbeat. A run must finish within the grace period after it's due, so the default grace leaves room for the job itself. Suspending the CronJob pauses its heartbeat, and resuming it resumes it.
 
 Discovered monitors are read-only in the UI, marked "Discovered in Kubernetes", and follow the resource: changing an annotation updates the monitor, and removing the label or the resource deletes it. You can still pause them and add them to the status page. Catch-all and wildcard hostnames are skipped. With `rbac.clusterWide: false` the agent only looks in its own namespace; set `discovery.enabled: false` in the chart (or `KUBERNETES_DISCOVERY=false`) to turn it off.
 
@@ -200,6 +204,10 @@ Ping monitors send three ICMP echo requests and are up if any reply comes back. 
 ### Alert routing
 
 A channel alerts for every monitor (the default, including monitors added later) or only for the monitors you choose. Set it on the channel under **Notifications**, or tick channels under **Alerts** when editing a monitor.
+
+### More services
+
+For anything without its own channel, add a **More services (Shoutrrr)** channel with a [Shoutrrr URL](https://shoutrrr.nickfedor.com/latest/services/overview/): `pushover://shoutrrr:<token>@<user>`, `gotify://<host>/<token>`, `matrix://<user>:<password>@<host>`, `googlechat://chat.googleapis.com/v1/spaces/...`, `opsgenie://api.opsgenie.com/<key>`, and 30+ more. The URL holds the service's credentials, so it's stored like a password and never shown in errors.
 
 ### Maintenance
 

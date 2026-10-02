@@ -71,7 +71,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := r.URL.Path
 	if strings.HasSuffix(key, "/pods") {
 		key += "?" + r.URL.Query().Get("labelSelector")
-	} else if r.URL.Query().Get("labelSelector") != "upti.my/monitor=true" {
+	} else if !strings.HasSuffix(key, "/jobs") && r.URL.Query().Get("labelSelector") != "upti.my/monitor=true" {
 		http.Error(w, "missing label selector", http.StatusBadRequest)
 		return
 	}

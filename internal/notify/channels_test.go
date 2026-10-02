@@ -282,3 +282,52 @@ func TestUptimy(t *testing.T) {
 		}
 	}
 }
+
+func TestShoutrrr(t *testing.T) {
+	srv := newCaptureHTTP(t)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	// Shoutrrr's generic service posts JSON to any URL.
+	send(t, Notifier{Name: "s", Type: "shoutrrr", Config: Config{URL: "generic://" + host + "/hook?disabletls=yes&template=json"}}, downAlert)
+	if len(srv.bodies) != 1 {
+		t.Fatalf("got %d requests", len(srv.bodies))
+	}
+	b := srv.bodies[0]
+	if b["title"] != "Uptimy Agent" || !strings.HasPrefix(b["message"].(string), "🔴 Checkout API is down\nHTTP 503\n") {
+		t.Fatalf("unexpected body %v", b)
+	}
+
+	for url, want := range map[string]string{
+		"":                       "enter a Shoutrrr URL",
+		"nonsense":               "enter a Shoutrrr URL",
+		"carrierpigeon://x":      `doesn't support "carrierpigeon"`,
+		"pushover://shoutrrr:@u": "invalid Shoutrrr URL",
+	} {
+		n := Notifier{Name: "s", Type: "shoutrrr", Config: Config{URL: url}}
+		if err := n.Normalize(); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: got %v, want %q", url, err, want)
+		}
+	}
+}
+
+// A failed send's error never repeats the URL, which holds credentials.
+func TestShoutrrrErrorHidesURL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	// A token the service rejects as malformed, and one the server refuses.
+	for _, secret := range []string{"s3cr3t-app-token", "AbCdEfGhIjKlMnO"} {
+		n := Notifier{Name: "s", Type: "shoutrrr", Config: Config{URL: "gotify://" + strings.TrimPrefix(srv.URL, "http://") + "/" + secret + "?disabletls=yes"}}
+		if err := n.Normalize(); err != nil {
+			t.Fatal(err)
+		}
+		err := testSender().Send(context.Background(), n, downAlert)
+		if err == nil {
+			t.Fatalf("%s: expected an error", secret)
+		}
+		t.Logf("%s: %v", secret, err)
+		if strings.Contains(err.Error(), secret) {
+			t.Fatalf("error leaks the token: %v", err)
+		}
+	}
+}

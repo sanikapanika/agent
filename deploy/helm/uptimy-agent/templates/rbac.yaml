@@ -30,6 +30,10 @@ rules:
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["list"]
+  # CronJob heartbeats read their runs from the CronJob's Jobs.
+  - apiGroups: ["batch"]
+    resources: ["cronjobs", "jobs"]
+    verbs: ["list"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses"]
     verbs: ["list"]

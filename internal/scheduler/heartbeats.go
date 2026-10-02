@@ -38,6 +38,7 @@ const maxRunDuration = 24 * time.Hour
 type ping struct {
 	signal  Signal
 	message string
+	at      time.Time // when it happened; zero is now
 }
 
 // HeartbeatStatus is where a heartbeat stands against its schedule.
@@ -111,6 +112,22 @@ func (s *Scheduler) Ping(token string, signal Signal, message string) error {
 		return nil
 	case <-r.done:
 		return nil // stopped in between: being edited or deleted
+	}
+}
+
+// Report delivers a run's start or finish that happened at at, to heartbeat
+// id: for runs the agent observes itself (a Kubernetes CronJob's Jobs)
+// rather than ones that ping. Like a ping, it's ignored while paused.
+func (s *Scheduler) Report(id int64, signal Signal, at time.Time, message string) {
+	s.mu.Lock()
+	r, running := s.runners[id].(*heartbeatRunner)
+	s.mu.Unlock()
+	if !running {
+		return
+	}
+	select {
+	case r.pings <- ping{signal: signal, message: message, at: at}:
+	case <-r.done:
 	}
 }
 
@@ -241,6 +258,9 @@ func (t *heartbeatTracker) miss(ctx context.Context, due time.Time) {
 // handle applies a ping. due and deadline are for the run it reports.
 func (t *heartbeatTracker) handle(ctx context.Context, p ping, due, deadline time.Time) {
 	now := now()
+	if !p.at.IsZero() && p.at.Before(now) {
+		now = p.at
+	}
 	if p.signal == SignalStart {
 		t.start(ctx, now, due)
 		return
@@ -251,8 +271,10 @@ func (t *heartbeatTracker) handle(ctx context.Context, p ping, due, deadline tim
 	case t.state == monitor.StateMissed && t.missed != nil && now.Before(due):
 		// The run recorded as missed arrived after all, before the next was
 		// due: it was late, not absent.
+		// (A reported run can also have been on time: it finished before
+		// the deadline, and was only seen after it.)
 		run = *t.missed
-		run.OnTime, run.Message = false, p.message
+		run.OnTime, run.Message = run.DueAt != nil && !now.After(run.DueAt.Add(t.h.Grace())), p.message
 	case t.open != nil && now.Sub(*t.open.StartedAt) <= maxRunDuration:
 		run.ID, run.StartedAt = t.open.ID, t.open.StartedAt
 	}

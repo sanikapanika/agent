@@ -4,9 +4,10 @@ Open-source, self-hosted uptime monitoring that runs inside your cluster. It che
 
 - **Healthchecks:** HTTP(S) with status and keyword checks, TCP, ping, DNS, TLS certificate expiry, Postgres, MySQL and Redis (a real login and query), and Kubernetes Deployments, StatefulSets and DaemonSets with fewer ready replicas than they should have.
 - **Heartbeats** for CronJobs, backups and workers: an interval or a cron schedule in any time zone, with missed and failed runs, exit codes and durations.
-- **Alerts** by email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty, webhooks and Uptimy.
+- **Alerts** by email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty, webhooks, Uptimy and 30+ more services through a Shoutrrr URL.
 - **Status page** at `/status` with your logo, sections and public names. It never shows internal hostnames.
-- **Auto-discovery:** label a Service, Ingress, HTTPRoute or workload with `upti.my/monitor: "true"` and it's monitored within 30 seconds.
+- **Auto-discovery:** label a Service, Ingress, HTTPRoute, workload or CronJob with `upti.my/monitor: "true"` and it's monitored within 30 seconds.
+- **CronJobs without pings:** a labeled CronJob gets a heartbeat whose runs are read from its Jobs: start, finish, duration, and why it failed (exit code, OOMKilled).
 - **Monitors in Git:** or put them in `values.yaml` and they're rendered into a ConfigMap.
 
 [Source and docs](https://github.com/uptimy/agent) · [Live demo](https://uptimy-agent-production-b9a3.up.railway.app/status)
@@ -23,7 +24,7 @@ Open http://localhost:8080 and sign in as `admin` with the password from the log
 
 ## Auto-discovery
 
-Label what you want monitored. A Service gets an HTTP check on its cluster DNS name, on its pods' readinessProbe path (or a TCP connect for ports that aren't HTTP), an Ingress or HTTPRoute an HTTP check per hostname, and a Deployment, StatefulSet or DaemonSet a readiness check.
+Label what you want monitored. A Service gets an HTTP check on its cluster DNS name, on its pods' readinessProbe path (or a TCP connect for ports that aren't HTTP), an Ingress or HTTPRoute an HTTP check per hostname, a Deployment, StatefulSet or DaemonSet a readiness check, and a CronJob a heartbeat on its schedule whose runs are read from its Jobs, so the job needs no ping.
 
 Put `upti.my/type: kubernetes` on a Service to reuse its pods' readinessProbes instead: it's up while it has a ready endpoint, with no traffic to the app. Without it, the check tests the real path through DNS, the Service and the app. Annotations adjust the check:
 
@@ -37,7 +38,7 @@ metadata:
     upti.my/interval: 30s        # default: 1m
 ```
 
-All annotations (`port`, `type`, `scheme`, `expected-status`, `keyword`) are in the [agent README](https://github.com/uptimy/agent#auto-discovery). Removing the label deletes the monitor. Discovery lists only labeled objects; turn it off with `discovery.enabled: false`.
+All annotations (`port`, `type`, `scheme`, `expected-status`, `keyword`, and `grace` for CronJobs) are in the [agent README](https://github.com/uptimy/agent#auto-discovery). Removing the label deletes the monitor. Discovery lists only labeled objects; turn it off with `discovery.enabled: false`.
 
 ## Monitors in values
 
@@ -96,7 +97,7 @@ ingress:
 | `healthchecks` / `heartbeats` | `[]` | Monitors defined in values |
 | `retentionDays` | `30` | How long check results are kept |
 | `discovery.enabled` | `true` | Monitor resources labeled `upti.my/monitor: "true"` |
-| `rbac.create` | `true` | Read-only access for checks (Deployments, StatefulSets, DaemonSets, Services, EndpointSlices) and discovery (listing Services, Ingresses, HTTPRoutes and pods) |
+| `rbac.create` | `true` | Read-only access for checks (Deployments, StatefulSets, DaemonSets, Services, EndpointSlices) and discovery (listing Services, Ingresses, HTTPRoutes, CronJobs, Jobs and pods) |
 | `rbac.clusterWide` | `true` | `false` limits that access to the release namespace |
 | `serviceAccount.create` / `.name` | `true` / `""` | Service account for Kubernetes checks |
 | `persistence.enabled` | `true` | Keep data on a PVC (SQLite) |

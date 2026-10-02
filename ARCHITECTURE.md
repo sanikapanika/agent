@@ -51,7 +51,7 @@ In SQLite a `monitors` row holds what's shared, and a `healthchecks` or `heartbe
 
 ## A healthcheck, end to end
 
-1. On start, `cmd/uptimy-agent` opens the store, syncs monitors from the YAML file (`filesync`), and hands them all to the **scheduler**. Inside Kubernetes, `discovery` lists resources labeled `upti.my/monitor=true` every 30 seconds and hands what changed to the scheduler too. Both sync through `managed`: each source owns its monitors by name, and the API refuses to edit them.
+1. On start, `cmd/uptimy-agent` opens the store, syncs monitors from the YAML file (`filesync`), and hands them all to the **scheduler**. Inside Kubernetes, `discovery` lists resources labeled `upti.my/monitor=true` every 30 seconds and hands what changed to the scheduler too. Both sync through `managed`: each source owns its monitors by name, and the API refuses to edit them. A discovered CronJob is a heartbeat whose runs `discovery/jobs.go` reads from its Jobs every 10 seconds and hands to the scheduler with `Scheduler.Report`, at the times Kubernetes recorded, instead of a ping.
 2. The scheduler runs one goroutine per monitor. For a healthcheck it calls `checks.Run` on every interval, with the check's timeout.
 3. `checks.Run` finds the check type's **probe** (registered by `internal/checks/<type>.go`) and returns an `Outcome`: OK, plus a message.
 4. The scheduler stores the result and publishes it to the **events hub**, which streams it to open browsers over Server-Sent Events.
