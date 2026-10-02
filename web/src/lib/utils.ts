@@ -22,6 +22,29 @@ export function formatInterval(seconds: number) {
   return `${seconds}s`;
 }
 
+/** 21600 → "6 hours", 604800 → "1 week". */
+export function formatSpan(seconds: number) {
+  const units: [number, string][] = [
+    [31536000, "year"],
+    [604800, "week"],
+    [86400, "day"],
+    [3600, "hour"],
+    [60, "minute"],
+  ];
+  const [size, name] = units.find(([size]) => seconds >= size && seconds % size === 0) ?? [1, "second"];
+  const n = seconds / size;
+  return `${n} ${name}${n === 1 ? "" : "s"}`;
+}
+
+/** The stop nearest to seconds, so a typed value still places the thumb. */
+export function nearestStep(seconds: number, steps: number[]) {
+  let best = 0;
+  steps.forEach((s, i) => {
+    if (Math.abs(s - seconds) < Math.abs(steps[best] - seconds)) best = i;
+  });
+  return best;
+}
+
 /** 5 → "5 min", 60 → "1 hour", 240 → "4 hours". */
 export function formatMinutes(minutes: number) {
   if (minutes % 60 === 0) return minutes === 60 ? "1 hour" : `${minutes / 60} hours`;

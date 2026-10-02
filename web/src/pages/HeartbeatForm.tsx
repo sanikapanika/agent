@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useParams } from "react-router";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { api, type HeartbeatInput, type HeartbeatSpec } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { cn, formatSpan, nearestStep } from "@/lib/utils";
 import { monitorPath } from "@/lib/monitors";
 import { Field, Input, Select } from "@/components/ui/input";
 import { ErrorNote } from "@/components/Layout";
@@ -23,6 +23,17 @@ function toUnit(seconds: number, units: Unit[] = ["days", "hours", "minutes"]) {
   const unit = units.find((u) => seconds % unitSeconds[u] === 0) ?? "minutes";
   return { value: Math.max(1, Math.round(seconds / unitSeconds[unit])), unit };
 }
+
+// Slider stops, in seconds, within what the agent accepts: an interval of 1
+// minute to 366 days, a grace period of 1 minute to 7 days. The exact value
+// can still be typed below the slider.
+const intervalSteps = [
+  60, 120, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400, 172800, 604800, 1209600, 2592000, 7776000, 15552000,
+  31536000,
+];
+const intervalMarks = { 0: "1m", 6: "1h", 10: "1d", 14: "30d", 17: "1y" };
+const graceSteps = [60, 120, 300, 600, 900, 1800, 3600, 7200, 21600, 43200, 86400, 172800, 604800];
+const graceMarks = { 0: "1m", 6: "1h", 10: "1d", 12: "7d" };
 
 const cronPresets = [
   { label: "Hourly", cron: "0 * * * *" },
@@ -65,7 +76,7 @@ function fromSpec(name: string, paused: boolean, h: HeartbeatSpec, notifierIDs: 
     every: h.every_seconds ? toUnit(h.every_seconds) : empty.every,
     cron: h.cron || empty.cron,
     timezone: h.timezone || "UTC",
-    grace: toUnit(h.grace_seconds, ["hours", "minutes"]),
+    grace: toUnit(h.grace_seconds),
   };
 }
 
@@ -173,8 +184,10 @@ function HeartbeatFormBody({ editing, initial }: { editing: number | null; initi
 
         {form.mode === "every" ? (
           <Field label="Runs every" htmlFor="every" hint="The first run is due one interval after you save.">
-            <DurationInput
+            <DurationSlider
               id="every"
+              steps={intervalSteps}
+              marks={intervalMarks}
               value={form.every}
               onChange={(v) => set("every", v)}
               units={["minutes", "hours", "days"]}
@@ -233,11 +246,80 @@ function HeartbeatFormBody({ editing, initial }: { editing: number | null; initi
         htmlFor="grace"
         hint="How late a run can be before it counts as missed and you're alerted. Leave room for slow runs."
       >
-        <DurationInput id="grace" value={form.grace} onChange={(v) => set("grace", v)} units={["minutes", "hours"]} />
+        <DurationSlider
+          id="grace"
+          steps={graceSteps}
+          marks={graceMarks}
+          value={form.grace}
+          onChange={(v) => set("grace", v)}
+          units={["minutes", "hours", "days"]}
+        />
       </Field>
 
       <ChannelPicker ids={form.notifierIDs} onChange={(ids) => set("notifierIDs", ids)} />
     </FormShell>
+  );
+}
+
+/**
+ * A duration picked on a slider of common values (1m, 10m, 1h, 1d, ...),
+ * as on the Uptimy platform, with the exact value editable below it.
+ */
+function DurationSlider({
+  id,
+  steps,
+  marks,
+  value,
+  onChange,
+  units,
+}: {
+  id: string;
+  steps: number[];
+  marks: Record<number, string>;
+  value: { value: number; unit: Unit };
+  onChange: (v: { value: number; unit: Unit }) => void;
+  units: Unit[];
+}) {
+  const seconds = value.value * unitSeconds[value.unit];
+  const last = steps.length - 1;
+  // A stop shows in its largest whole unit: 1 day, not 1440 minutes.
+  const largestFirst = [...units].sort((a, b) => unitSeconds[b] - unitSeconds[a]);
+  // The thumb is 16px wide and stays inside the track, so the stops run
+  // from 8px in on each side.
+  const at = (i: number) => `calc(${(i / last) * 100}% + ${8 - (i / last) * 16}px)`;
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start gap-4">
+        <div className="min-w-0 flex-1">
+          <input
+            id={id}
+            type="range"
+            min={0}
+            max={last}
+            step={1}
+            value={nearestStep(seconds, steps)}
+            aria-valuetext={formatSpan(seconds)}
+            onChange={(e) => onChange(toUnit(steps[Number(e.target.value)], largestFirst))}
+            className="h-4 w-full cursor-pointer rounded-full accent-primary"
+          />
+          <div className="relative mt-1 h-4 text-xs text-muted-foreground" aria-hidden>
+            {Object.entries(marks).map(([i, label]) => (
+              <span key={i} className="absolute -translate-x-1/2 tabular-nums" style={{ left: at(Number(i)) }}>
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+        {/* A fixed width, so the track doesn't resize as the label changes. */}
+        <span className="w-28 shrink-0 rounded-full bg-primary py-0.5 text-center text-sm font-semibold whitespace-nowrap text-primary-foreground tabular-nums">
+          {formatSpan(seconds)}
+        </span>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-muted-foreground">Exactly</span>
+        <DurationInput id={`${id}-exact`} value={value} onChange={onChange} units={units} />
+      </div>
+    </div>
   );
 }
 
