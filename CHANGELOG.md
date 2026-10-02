@@ -4,6 +4,8 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-02
+
 ### Added
 - The Helm chart is published with each release: `helm install uptimy-agent oci://ghcr.io/uptimy/charts/uptimy-agent`, at the same version as the agent, and listed on Artifact Hub.
 - Images and charts are signed with cosign (keyless, from CI).
@@ -40,6 +42,7 @@ First public release.
 - API tokens (full or read-only) for scripts and CI.
 - Import monitors and notifications from Uptime Kuma (`kuma.db`), with a review step.
 
-[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/uptimy/agent/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/uptimy/agent/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/uptimy/agent/releases/tag/v0.1.0
