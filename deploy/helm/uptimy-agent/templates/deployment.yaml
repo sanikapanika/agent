@@ -47,6 +47,8 @@ spec:
               value: {{ .Values.retentionDays | quote }}
             - name: KUBERNETES_DISCOVERY
               value: {{ .Values.discovery.enabled | quote }}
+            - name: KUBERNETES_DISCOVERY_SERVICE_CHECK
+              value: {{ .Values.discovery.serviceCheck | quote }}
             {{- if or .Values.healthchecks .Values.heartbeats }}
             - name: MONITORS_FILE
               value: /config/monitors.yaml

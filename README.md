@@ -61,7 +61,7 @@ kubectl -n monitoring port-forward svc/uptimy-agent 8080:80
 
 The chart is released with the agent, at the same version, and signed with cosign. Its values are documented in the [chart README](deploy/helm/uptimy-agent/README.md).
 
-Inside a cluster the agent uses its service account to check Deployments, StatefulSets and DaemonSets. The chart creates a read-only role for that. Monitors can live in `values.yaml`:
+Inside a cluster the agent uses its service account to check Deployments, StatefulSets, DaemonSets and Services. The chart creates a read-only role for that. Monitors can live in `values.yaml`:
 
 ```yaml
 healthchecks:
@@ -84,7 +84,7 @@ Label a Service, Ingress, Gateway API HTTPRoute, Deployment, StatefulSet or Daem
 
 | Resource | Monitor | Default name |
 | --- | --- | --- |
-| Service | HTTP check on `http://<name>.<namespace>.svc:<port>/` when the port looks like HTTP (named `http`, `https`, `web` or `http-…`, an HTTP `appProtocol`, or port 80, 443 or 8080), otherwise a TCP connect | `<namespace>/<name>` |
+| Service | HTTP check on `http://<name>.<namespace>.svc:<port>` with the path (and scheme) of its pods' readinessProbe, when they have one on that port, otherwise `/`. Ports with no HTTP readinessProbe that don't look like HTTP (named `http`, `https`, `web` or `http-…`, an HTTP `appProtocol`, or port 80, 443 or 8080) get a TCP connect | `<namespace>/<name>` |
 | Ingress | HTTP check per hostname, over HTTPS when the Ingress has TLS for it | the hostname |
 | HTTPRoute | HTTPS check per hostname | the hostname |
 | Deployment, StatefulSet, DaemonSet | readiness check: all replicas ready | `<namespace>/<name> (<kind>)` |
@@ -102,14 +102,16 @@ metadata:
     upti.my/path: /health
 ```
 
+A Service can be checked two ways. **Probe** (the default) is the agent's own request, end to end through DNS, the Service and the app, as described above. **Kubernetes** reuses the kubelet's readinessProbes instead: the Service is up while it has a ready endpoint, and the agent sends the app no traffic. It works on any port and protocol, but only knows what the readinessProbe tests. Set it per Service with `upti.my/type: kubernetes`, or for the whole cluster with `discovery.serviceCheck: kubernetes` in the chart (`KUBERNETES_DISCOVERY_SERVICE_CHECK`). You can also add a Service check by hand: a Kubernetes healthcheck on `<namespace>/service/<name>`.
+
 Annotations adjust what's checked:
 
 | Annotation | Applies to | Default |
 | --- | --- | --- |
 | `upti.my/name` | all | see above |
-| `upti.my/path` | Service, Ingress, HTTPRoute | `/`. On a Service it also makes the check HTTP |
+| `upti.my/path` | Service, Ingress, HTTPRoute | a Service's readinessProbe path, else `/`. On a Service it also makes the check HTTP |
 | `upti.my/port` | Service | the first port (a name or a number) |
-| `upti.my/type` | Service | `http` or `tcp`, picked from the port |
+| `upti.my/type` | Service | `http`, `tcp` or `kubernetes`; picked as above |
 | `upti.my/scheme` | Service, Ingress, HTTPRoute | `http` or `https`, picked as above |
 | `upti.my/interval` | all | `1m` (e.g. `30s`) |
 | `upti.my/expected-status` | HTTP checks | `200-399` |
@@ -136,6 +138,7 @@ Environment variables set how the agent runs, its secrets, and (optionally) moni
 | `MONITORS_FILE` | – | Path to a YAML file of monitors |
 | `MONITORS_YAML` | – | The YAML itself, for platforms where mounting files is awkward |
 | `KUBERNETES_DISCOVERY` | `true` | Create monitors for resources labeled `upti.my/monitor: "true"` (see [Auto-discovery](#auto-discovery)). Only applies inside a cluster |
+| `KUBERNETES_DISCOVERY_SERVICE_CHECK` | `probe` | How discovered Services are checked: `probe` (the agent's own request) or `kubernetes` (their ready endpoints) |
 | `RETENTION_DAYS` | `30` | How long check results, heartbeat runs and events are kept |
 | `UPTIMY_HEARTBEAT_URL` | – | Optional. Pins the [Watch the watcher](#watch-the-watcher) heartbeat, for agents without a persistent volume; otherwise connect it in the UI |
 | `AGENT_NAME` | hostname | How this agent is labeled in Uptimy |

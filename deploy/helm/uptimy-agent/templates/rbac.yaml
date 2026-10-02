@@ -17,10 +17,18 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets", "daemonsets"]
     verbs: ["get"{{ if .Values.discovery.enabled }}, "list"{{ end }}]
-  {{- if .Values.discovery.enabled }}
-  # Discovery lists only objects labeled upti.my/monitor=true.
+  # kubernetes checks on a Service count its ready endpoints.
   - apiGroups: [""]
     resources: ["services"]
+    verbs: ["get"{{ if .Values.discovery.enabled }}, "list"{{ end }}]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["list"]
+  {{- if .Values.discovery.enabled }}
+  # Discovery lists only objects labeled upti.my/monitor=true, and the pods
+  # behind a discovered Service to find their readinessProbe path.
+  - apiGroups: [""]
+    resources: ["pods"]
     verbs: ["list"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses"]

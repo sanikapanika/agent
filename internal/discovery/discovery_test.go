@@ -26,8 +26,26 @@ const services = `{"items":[
    "upti.my/port":"admin","upti.my/path":"healthz","upti.my/interval":"30s","upti.my/keyword":"ok"}},
   "spec":{"ports":[{"name":"grpc","port":9090},{"name":"admin","port":9091}]}},
  {"metadata":{"name":"broken","namespace":"shop","annotations":{"upti.my/interval":"often"}},
-  "spec":{"ports":[{"port":80}]}}
+  "spec":{"ports":[{"port":80}]}},
+ {"metadata":{"name":"web","namespace":"shop"},
+  "spec":{"selector":{"app":"web"},"ports":[{"name":"main","port":80,"targetPort":"http"}]}},
+ {"metadata":{"name":"grpcish","namespace":"shop"},
+  "spec":{"selector":{"app":"grpcish"},"ports":[{"name":"api","port":9000,"targetPort":9000}]}},
+ {"metadata":{"name":"admin","namespace":"shop"},
+  "spec":{"selector":{"app":"admin"},"ports":[{"name":"http","port":80,"targetPort":8080}]}},
+ {"metadata":{"name":"queue","namespace":"shop","annotations":{"upti.my/type":"kubernetes"}},
+  "spec":{"selector":{"app":"queue"},"ports":[{"port":5672}]}}
 ]}`
+
+// Pods behind the Services, by label selector.
+const (
+	webPods = `{"items":[{"spec":{"containers":[{"ports":[{"name":"http","containerPort":3000}],
+  "readinessProbe":{"httpGet":{"path":"/healthz","port":"http"}}}]}}]}`
+	grpcishPods = `{"items":[{"spec":{"containers":[{"readinessProbe":{"httpGet":{"path":"/ready","port":9000,"scheme":"HTTPS"}}}]}}]}`
+	// The probe is on another port than the one the Service sends traffic to.
+	adminPods = `{"items":[{"spec":{"containers":[{"ports":[{"containerPort":8080},{"containerPort":8081}],
+  "readinessProbe":{"httpGet":{"path":"/ready","port":8081}}}]}}]}`
+)
 
 const ingresses = `{"items":[
  {"metadata":{"name":"shop","namespace":"shop"},
@@ -50,15 +68,18 @@ type fakeAPI struct {
 func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if r.URL.Query().Get("labelSelector") != "upti.my/monitor=true" {
+	key := r.URL.Path
+	if strings.HasSuffix(key, "/pods") {
+		key += "?" + r.URL.Query().Get("labelSelector")
+	} else if r.URL.Query().Get("labelSelector") != "upti.my/monitor=true" {
 		http.Error(w, "missing label selector", http.StatusBadRequest)
 		return
 	}
-	if code := f.status[r.URL.Path]; code != 0 {
+	if code := f.status[key]; code != 0 {
 		http.Error(w, "nope", code)
 		return
 	}
-	body, ok := f.responses[r.URL.Path]
+	body, ok := f.responses[key]
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -73,17 +94,24 @@ func (f *fakeAPI) set(path, body string) {
 }
 
 func newFake(t *testing.T) (*fakeAPI, *Discoverer) {
+	return newFakeMode(t, ServiceProbe)
+}
+
+func newFakeMode(t *testing.T, serviceCheck string) (*fakeAPI, *Discoverer) {
 	f := &fakeAPI{responses: map[string]string{
-		"/api/v1/services":                     services,
-		"/apis/networking.k8s.io/v1/ingresses": ingresses,
-		"/apis/apps/v1/deployments":            deployments,
-		"/apis/apps/v1/statefulsets":           `{"items":[]}`,
-		"/apis/apps/v1/daemonsets":             `{"items":[]}`,
+		"/api/v1/services":                         services,
+		"/apis/networking.k8s.io/v1/ingresses":     ingresses,
+		"/apis/apps/v1/deployments":                deployments,
+		"/apis/apps/v1/statefulsets":               `{"items":[]}`,
+		"/apis/apps/v1/daemonsets":                 `{"items":[]}`,
+		"/api/v1/namespaces/shop/pods?app=web":     webPods,
+		"/api/v1/namespaces/shop/pods?app=grpcish": grpcishPods,
+		"/api/v1/namespaces/shop/pods?app=admin":   adminPods,
 		// No Gateway API: httproutes are a 404.
 	}, status: map[string]int{}}
 	srv := httptest.NewServer(f)
 	t.Cleanup(srv.Close)
-	return f, New(kube.New(srv.URL, "monitoring"), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	return f, New(kube.New(srv.URL, "monitoring"), slog.New(slog.NewTextHandler(io.Discard, nil)), serviceCheck)
 }
 
 func byName(ds []managed.Desired) map[string]monitor.Check {
@@ -112,6 +140,12 @@ func TestDiscover(t *testing.T) {
 		"shop.example.com":           {monitor.TypeHTTP, "https://shop.example.com/", 60},
 		"admin.example.com":          {monitor.TypeHTTP, "http://admin.example.com/", 60},
 		"shop/checkout (deployment)": {monitor.TypeKubernetes, "shop/deployment/checkout", 60},
+		// The pods' readinessProbe path and scheme, on the Service's port.
+		"shop/web":     {monitor.TypeHTTP, "http://web.shop.svc:80/healthz", 60},
+		"shop/grpcish": {monitor.TypeHTTP, "https://grpcish.shop.svc:9000/ready", 60},
+		"shop/admin":   {monitor.TypeHTTP, "http://admin.shop.svc:80/", 60},
+		// upti.my/type: kubernetes reuses the readinessProbes instead.
+		"shop/queue": {monitor.TypeKubernetes, "shop/service/queue", 60},
 	}
 	for name, w := range want {
 		c, ok := got[name]
@@ -184,7 +218,7 @@ func TestSyncKeepsPause(t *testing.T) {
 		}
 		return ch
 	}
-	if ch := rescan(); ch.Created != 6 {
+	if ch := rescan(); ch.Created != 10 {
 		t.Fatalf("created %d", ch.Created)
 	}
 	all, _ := st.ListMonitors(ctx)
@@ -204,5 +238,79 @@ func TestSyncKeepsPause(t *testing.T) {
 	f.set("/apis/networking.k8s.io/v1/ingresses", `{"items":[]}`)
 	if ch := rescan(); len(ch.Deleted) != 2 || len(ch.Saved) != 0 {
 		t.Fatalf("got %+v", ch)
+	}
+}
+
+// In kubernetes mode Services are checked by their ready endpoints, unless
+// their annotations ask for an HTTP check.
+func TestDiscoverKubernetesMode(t *testing.T) {
+	_, d := newFakeMode(t, ServiceKubernetes)
+	ds, err := d.Discover(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := byName(ds)
+	if c := got["shop/checkout"]; c.Type != monitor.TypeKubernetes || c.Target != "shop/service/checkout" {
+		t.Errorf("checkout: %s %s", c.Type, c.Target)
+	}
+	if c := got["shop/api"]; c.Type != monitor.TypeHTTP {
+		t.Errorf("api has upti.my/path, so it stays HTTP: %s", c.Type)
+	}
+}
+
+// Without pods (scaled to zero) a Service keeps the path found before; if
+// pods can't be listed, it falls back to /.
+func TestReadinessProbeFallbacks(t *testing.T) {
+	f, d := newFake(t)
+	target := func() string {
+		t.Helper()
+		ds, err := d.Discover(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return byName(ds)["shop/web"].Target
+	}
+	if got := target(); got != "http://web.shop.svc:80/healthz" {
+		t.Fatalf("got %s", got)
+	}
+	f.set("/api/v1/namespaces/shop/pods?app=web", `{"items":[]}`)
+	if got := target(); got != "http://web.shop.svc:80/healthz" {
+		t.Fatalf("scaled to zero: got %s", got)
+	}
+
+	f2, d2 := newFake(t)
+	f2.status["/api/v1/namespaces/shop/pods?app=web"] = http.StatusForbidden
+	d = d2
+	if got := target(); got != "http://web.shop.svc:80/" {
+		t.Fatalf("pods forbidden: got %s", got)
+	}
+
+	// Any other failure fails the scan rather than changing the target.
+	f2.status["/api/v1/namespaces/shop/pods?app=web"] = http.StatusInternalServerError
+	if _, err := d2.Discover(context.Background()); err == nil {
+		t.Fatal("a pod listing failure didn't fail the scan")
+	}
+}
+
+// A typo in an annotation keeps the monitor it had, rather than deleting it
+// and its history.
+func TestInvalidAnnotationKeepsMonitor(t *testing.T) {
+	f, d := newFake(t)
+	if _, err := d.Discover(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.set("/apis/apps/v1/deployments", `{"items":[{"metadata":{"name":"checkout","namespace":"shop","annotations":{"upti.my/interval":"soon"}}}]}`)
+	ds, err := d.Discover(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c, ok := byName(ds)["shop/checkout (deployment)"]; !ok || c.IntervalSeconds != 60 {
+		t.Fatalf("the monitor wasn't kept as it was: %v %+v", ok, c)
+	}
+	// Removing the label still deletes it.
+	f.set("/apis/apps/v1/deployments", `{"items":[]}`)
+	ds, _ = d.Discover(context.Background())
+	if _, ok := byName(ds)["shop/checkout (deployment)"]; ok {
+		t.Fatal("kept after the label was removed")
 	}
 }

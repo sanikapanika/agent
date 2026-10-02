@@ -4,6 +4,11 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Added
+- Discovered Services are checked on their pods' readinessProbe path (and scheme) instead of `/`, and ports with an HTTP readinessProbe get an HTTP check even when they don't look like HTTP.
+- Kubernetes Service checks (`<namespace>/service/<name>`): up while the Service has a ready endpoint, reusing the pods' readinessProbes with no traffic to the app. Discovery uses them with `upti.my/type: kubernetes`, or for every Service with `discovery.serviceCheck: kubernetes` (`KUBERNETES_DISCOVERY_SERVICE_CHECK`).
+- The chart lets the agent read Services and EndpointSlices, and list pods when discovery is on.
+
 ## [0.1.3] - 2026-10-02
 
 ### Added

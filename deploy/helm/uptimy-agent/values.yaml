@@ -45,6 +45,14 @@ retentionDays: 30
 # something is labeled.
 discovery:
   enabled: true
+  # How discovered Services are checked (upti.my/type overrides it per
+  # Service):
+  #   probe:      the agent's own HTTP request to the Service, on the pods'
+  #               readinessProbe path (TCP if they have none and the port
+  #               isn't HTTP). Tests the real path: DNS, Service, the app.
+  #   kubernetes: reuse the pods' readinessProbes: up while the Service has
+  #               a ready endpoint. No traffic to the app.
+  serviceCheck: probe
 
 # Read-only access to Deployments/StatefulSets/DaemonSets for kubernetes
 # checks, plus listing labeled Services/Ingresses/HTTPRoutes for discovery.

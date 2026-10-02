@@ -88,8 +88,8 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("start scheduler: %w", err)
 	}
 	if kc != nil && cfg.KubernetesDiscovery {
-		log.Info("kubernetes discovery enabled", "label", discovery.Label+"=true")
-		go discovery.New(kc, log).Run(ctx, st, func(ch managed.Changes) {
+		log.Info("kubernetes discovery enabled", "label", discovery.Label+"=true", "services", cfg.DiscoveryServiceCheck)
+		go discovery.New(kc, log, cfg.DiscoveryServiceCheck).Run(ctx, st, func(ch managed.Changes) {
 			for _, id := range ch.Deleted {
 				sched.Remove(id)
 			}

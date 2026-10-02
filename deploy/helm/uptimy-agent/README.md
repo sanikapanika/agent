@@ -23,7 +23,9 @@ Open http://localhost:8080 and sign in as `admin` with the password from the log
 
 ## Auto-discovery
 
-Label what you want monitored. A Service gets an HTTP check on its cluster DNS name (or a TCP connect for ports that aren't HTTP), an Ingress or HTTPRoute an HTTP check per hostname, and a Deployment, StatefulSet or DaemonSet a readiness check. Annotations adjust it:
+Label what you want monitored. A Service gets an HTTP check on its cluster DNS name, on its pods' readinessProbe path (or a TCP connect for ports that aren't HTTP), an Ingress or HTTPRoute an HTTP check per hostname, and a Deployment, StatefulSet or DaemonSet a readiness check.
+
+Set `discovery.serviceCheck: kubernetes` (or `upti.my/type: kubernetes` on one Service) to reuse the pods' readinessProbes instead: the Service is up while it has a ready endpoint, with no traffic to the app. The default, `probe`, tests the real path through DNS, the Service and the app. Annotations adjust the check:
 
 ```yaml
 metadata:
@@ -31,7 +33,7 @@ metadata:
     upti.my/monitor: "true"
   annotations:
     upti.my/name: Checkout API   # default: <namespace>/<name>
-    upti.my/path: /health        # default: /
+    upti.my/path: /health        # default: the readinessProbe path, else /
     upti.my/interval: 30s        # default: 1m
 ```
 
@@ -94,7 +96,8 @@ ingress:
 | `healthchecks` / `heartbeats` | `[]` | Monitors defined in values |
 | `retentionDays` | `30` | How long check results are kept |
 | `discovery.enabled` | `true` | Monitor resources labeled `upti.my/monitor: "true"` |
-| `rbac.create` | `true` | Read-only access to Deployments, StatefulSets and DaemonSets, and listing Services, Ingresses and HTTPRoutes for discovery |
+| `discovery.serviceCheck` | `probe` | Discovered Services: `probe` (the agent's own request) or `kubernetes` (ready endpoints, from their readinessProbes) |
+| `rbac.create` | `true` | Read-only access for checks (Deployments, StatefulSets, DaemonSets, Services, EndpointSlices) and discovery (listing Services, Ingresses, HTTPRoutes and pods) |
 | `rbac.clusterWide` | `true` | `false` limits that access to the release namespace |
 | `serviceAccount.create` / `.name` | `true` / `""` | Service account for Kubernetes checks |
 | `persistence.enabled` | `true` | Keep data on a PVC (SQLite) |

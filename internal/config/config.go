@@ -31,6 +31,10 @@ type Config struct {
 	// upti.my/monitor=true when running in a cluster. On by default: nothing
 	// happens until something is labeled.
 	KubernetesDiscovery bool
+	// DiscoveryServiceCheck is how discovered Services are checked: "probe"
+	// (the agent's own HTTP/TCP request) or "kubernetes" (their ready
+	// endpoints, reusing the pods' readinessProbes).
+	DiscoveryServiceCheck string
 
 	// UptimyHeartbeatURL pins the "Watch the watcher" check-in URL, for
 	// agents whose database doesn't survive a restart. Usually it's set up
@@ -66,6 +70,11 @@ func Load() (Config, error) {
 		UptimyAPIURL:        env("UPTIMY_API_URL", "https://api.upti.my"),
 		UptimyHeartbeatsURL: env("UPTIMY_HEARTBEATS_URL", "https://heartbeats.upti.my"),
 		AgentName:           os.Getenv("AGENT_NAME"),
+
+		DiscoveryServiceCheck: env("KUBERNETES_DISCOVERY_SERVICE_CHECK", "probe"),
+	}
+	if c.DiscoveryServiceCheck != "probe" && c.DiscoveryServiceCheck != "kubernetes" {
+		return c, fmt.Errorf("KUBERNETES_DISCOVERY_SERVICE_CHECK must be probe or kubernetes")
 	}
 	if c.AgentName == "" {
 		c.AgentName, _ = os.Hostname()

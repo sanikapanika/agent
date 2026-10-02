@@ -14,6 +14,7 @@ package discovery
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -37,11 +38,11 @@ type resource struct {
 	kind  string // as in monitor names and logs
 	group string // API path prefix
 	name  string // plural, as in the API path
-	build func(o object) ([]monitor.Monitor, error)
+	build func(d *Discoverer, ctx context.Context, o object) ([]monitor.Monitor, error)
 }
 
 var resources = []resource{
-	{"service", "/api/v1", "services", fromService},
+	{"service", "/api/v1", "services", (*Discoverer).fromService},
 	{"ingress", "/apis/networking.k8s.io/v1", "ingresses", fromIngress},
 	{"httproute", "/apis/gateway.networking.k8s.io/v1", "httproutes", fromHTTPRoute},
 	{"deployment", "/apis/apps/v1", "deployments", fromWorkload("deployment")},
@@ -49,10 +50,30 @@ var resources = []resource{
 	{"daemonset", "/apis/apps/v1", "daemonsets", fromWorkload("daemonset")},
 }
 
+// How a discovered Service is checked, unless its upti.my/type says.
+const (
+	// ServiceProbe: the agent sends its own request (HTTP or TCP) to the
+	// Service, end to end through DNS and kube-proxy.
+	ServiceProbe = "probe"
+	// ServiceKubernetes: reuse the kubelet's readinessProbes; the Service is
+	// up while it has a ready endpoint. No traffic to the app.
+	ServiceKubernetes = "kubernetes"
+)
+
 // Discoverer scans the cluster for labeled resources.
 type Discoverer struct {
-	kube *kube.Client
-	log  *slog.Logger
+	kube         *kube.Client
+	log          *slog.Logger
+	serviceCheck string // ServiceProbe or ServiceKubernetes
+
+	// probes remembers each Service's readinessProbe (namespace/name), so
+	// its check keeps the same path while it has no pods (scaled to zero,
+	// mid-rollout).
+	probes map[string]probe
+	// built holds the monitors each object last produced ("kind ns/name").
+	// When an object's annotations stop being valid, its monitors stay as
+	// they were instead of being deleted with their history.
+	built map[string][]monitor.Monitor
 
 	// namespaced: listing this resource cluster-wide was forbidden (the
 	// chart's rbac.clusterWide=false), so only the agent's namespace is
@@ -63,10 +84,19 @@ type Discoverer struct {
 	warned map[string]bool
 }
 
-// New returns a Discoverer.
-func New(k *kube.Client, log *slog.Logger) *Discoverer {
-	return &Discoverer{kube: k, log: log, namespaced: map[string]bool{}, warned: map[string]bool{}}
+// New returns a Discoverer. serviceCheck is ServiceProbe or
+// ServiceKubernetes.
+func New(k *kube.Client, log *slog.Logger, serviceCheck string) *Discoverer {
+	return &Discoverer{
+		kube: k, log: log, serviceCheck: serviceCheck,
+		probes: map[string]probe{}, built: map[string][]monitor.Monitor{},
+		namespaced: map[string]bool{}, warned: map[string]bool{},
+	}
 }
+
+// scanError is an API failure while building monitors. Unlike a bad
+// annotation, it fails the whole scan.
+type scanError struct{ error }
 
 // Discover returns the monitors the cluster asks for. Resource types the
 // cluster doesn't have (no Gateway API) or RBAC doesn't allow are skipped.
@@ -74,7 +104,8 @@ func New(k *kube.Client, log *slog.Logger) *Discoverer {
 // monitors.
 func (d *Discoverer) Discover(ctx context.Context) ([]managed.Desired, error) {
 	var out []managed.Desired
-	seen := map[string]string{} // monitor name → resource it came from
+	seen := map[string]string{}             // monitor name → resource it came from
+	built := map[string][]monitor.Monitor{} // replaces d.built once the scan completes
 	for _, r := range resources {
 		items, err := d.list(ctx, r)
 		if err != nil {
@@ -82,17 +113,30 @@ func (d *Discoverer) Discover(ctx context.Context) ([]managed.Desired, error) {
 		}
 		for _, o := range items {
 			from := fmt.Sprintf("%s %s/%s", r.kind, o.Metadata.Namespace, o.Metadata.Name)
-			ms, err := r.build(o)
-			if err != nil {
-				d.warn(from + ": " + err.Error())
-				continue
+			ms, err := r.build(d, ctx, o)
+			var se scanError
+			if errors.As(err, &se) {
+				return nil, se.error
 			}
-			for _, m := range ms {
-				m.Source = monitor.SourceKubernetes
-				if err := m.Normalize(); err != nil {
-					d.warn(fmt.Sprintf("%s: %s", from, err))
+			if err == nil {
+				for i := range ms {
+					ms[i].Source = monitor.SourceKubernetes
+					if err = ms[i].Normalize(); err != nil {
+						break
+					}
+				}
+			}
+			if err != nil {
+				prev, ok := d.built[from]
+				if !ok {
+					d.warn(from + ": " + err.Error())
 					continue
 				}
+				d.warn(fmt.Sprintf("%s: %s; keeping its monitor as it was", from, err))
+				ms = prev
+			}
+			built[from] = ms
+			for _, m := range ms {
 				if other, dup := seen[m.Name]; dup {
 					d.warn(fmt.Sprintf("%s: %s also wants the name %q; set %s/name on one of them", from, other, m.Name, prefix))
 					continue
@@ -102,6 +146,7 @@ func (d *Discoverer) Discover(ctx context.Context) ([]managed.Desired, error) {
 			}
 		}
 	}
+	d.built = built
 	return out, nil
 }
 

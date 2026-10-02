@@ -1,6 +1,8 @@
 package discovery
 
 import (
+	"cmp"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -72,24 +74,43 @@ func healthcheck(name string, c *monitor.Check) monitor.Monitor {
 }
 
 type servicePort struct {
-	Name        string `json:"name"`
-	Port        int    `json:"port"`
-	AppProtocol string `json:"appProtocol"`
+	Name        string      `json:"name"`
+	Port        int         `json:"port"`
+	TargetPort  intOrString `json:"targetPort"`
+	AppProtocol string      `json:"appProtocol"`
 }
 
-// fromService checks a Service on its cluster DNS name. Ports that look
-// like HTTP get an HTTP check, others a TCP connect.
-func fromService(o object) ([]monitor.Monitor, error) {
+// fromService checks a Service. In probe mode the agent sends its own
+// request to the Service's cluster DNS name: HTTP on the pods'
+// readinessProbe path when they have one, or when the port looks like HTTP,
+// otherwise a TCP connect. In kubernetes mode it reuses the kubelet's
+// readinessProbes: up while the Service has a ready endpoint.
+func (d *Discoverer) fromService(ctx context.Context, o object) ([]monitor.Monitor, error) {
 	opts, err := parseOptions(o)
 	if err != nil {
 		return nil, err
 	}
 	var spec struct {
-		Ports []servicePort `json:"ports"`
+		Selector map[string]string `json:"selector"`
+		Ports    []servicePort     `json:"ports"`
 	}
 	if err := json.Unmarshal(o.Spec, &spec); err != nil {
 		return nil, err
 	}
+	name := opts.name
+	if name == "" {
+		name = o.Metadata.Namespace + "/" + o.Metadata.Name
+	}
+
+	typ := opts.typ
+	if typ == "" && opts.path == "" && opts.scheme == "" && d.serviceCheck == ServiceKubernetes {
+		typ = "kubernetes"
+	}
+	if typ == "kubernetes" {
+		target := o.Metadata.Namespace + "/service/" + o.Metadata.Name
+		return []monitor.Monitor{healthcheck(name, &monitor.Check{Type: monitor.TypeKubernetes, Target: target, IntervalSeconds: opts.interval})}, nil
+	}
+
 	if len(spec.Ports) == 0 {
 		return nil, errors.New("has no ports")
 	}
@@ -104,15 +125,16 @@ func fromService(o object) ([]monitor.Monitor, error) {
 		p = spec.Ports[i]
 	}
 	host := net.JoinHostPort(o.Metadata.Name+"."+o.Metadata.Namespace+".svc", strconv.Itoa(p.Port))
-	name := opts.name
-	if name == "" {
-		name = o.Metadata.Namespace + "/" + o.Metadata.Name
-	}
 
-	typ := opts.typ
+	var rp probe
+	if (typ == "" || typ == "http") && (opts.path == "" || opts.scheme == "") {
+		if rp, err = d.readinessProbe(ctx, o, spec.Selector, p); err != nil {
+			return nil, err
+		}
+	}
 	if typ == "" {
 		typ = "tcp"
-		if opts.path != "" || opts.scheme != "" || isHTTP(p) {
+		if opts.path != "" || opts.scheme != "" || rp.path != "" || isHTTP(p) {
 			typ = "http"
 		}
 	}
@@ -120,20 +142,17 @@ func fromService(o object) ([]monitor.Monitor, error) {
 	case "tcp":
 		return []monitor.Monitor{healthcheck(name, &monitor.Check{Type: monitor.TypeTCP, Target: host, IntervalSeconds: opts.interval})}, nil
 	case "http":
-		scheme := opts.scheme
+		scheme := cmp.Or(opts.scheme, rp.scheme)
 		if scheme == "" {
 			scheme = "http"
 			if isHTTPS(p) {
 				scheme = "https"
 			}
 		}
-		path := opts.path
-		if path == "" {
-			path = "/"
-		}
+		path := cmp.Or(opts.path, rp.path, "/")
 		return []monitor.Monitor{healthcheck(name, opts.httpCheck(scheme+"://"+host+path))}, nil
 	}
-	return nil, fmt.Errorf("%s/type must be http or tcp", prefix)
+	return nil, fmt.Errorf("%s/type must be http, tcp or kubernetes", prefix)
 }
 
 // isHTTP: the port's appProtocol or name says HTTP (Istio-style names like
@@ -158,7 +177,7 @@ func isHTTPS(p servicePort) bool {
 
 // fromIngress checks each of an Ingress's hostnames from the outside, over
 // HTTPS when the Ingress has TLS for it.
-func fromIngress(o object) ([]monitor.Monitor, error) {
+func fromIngress(_ *Discoverer, _ context.Context, o object) ([]monitor.Monitor, error) {
 	var spec struct {
 		Rules []struct {
 			Host string `json:"host"`
@@ -191,7 +210,7 @@ func fromIngress(o object) ([]monitor.Monitor, error) {
 // fromHTTPRoute checks each of an HTTPRoute's hostnames. Whether the
 // Gateway terminates TLS isn't on the route, so it assumes HTTPS; set
 // upti.my/scheme: http otherwise.
-func fromHTTPRoute(o object) ([]monitor.Monitor, error) {
+func fromHTTPRoute(_ *Discoverer, _ context.Context, o object) ([]monitor.Monitor, error) {
 	var spec struct {
 		Hostnames []string `json:"hostnames"`
 	}
@@ -246,8 +265,8 @@ func fromHosts(o object, hosts []string, scheme func(host string) string) ([]mon
 }
 
 // fromWorkload checks that a workload has all its replicas ready.
-func fromWorkload(kind string) func(o object) ([]monitor.Monitor, error) {
-	return func(o object) ([]monitor.Monitor, error) {
+func fromWorkload(kind string) func(*Discoverer, context.Context, object) ([]monitor.Monitor, error) {
+	return func(_ *Discoverer, _ context.Context, o object) ([]monitor.Monitor, error) {
 		opts, err := parseOptions(o)
 		if err != nil {
 			return nil, err
