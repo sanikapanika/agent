@@ -39,8 +39,9 @@ export function Dashboard() {
         <div className="flex flex-col gap-6">
           <Summary healthchecks={healthchecks} heartbeats={heartbeats} />
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="flex min-w-0 flex-col gap-6">
+          {/* The summary's four columns and gap: the lists take three, activity one. */}
+          <div className="grid gap-4 xl:grid-cols-4">
+            <div className="flex min-w-0 flex-col gap-6 xl:col-span-3">
               <KindSection kind="healthcheck" icon={HeartPulse} count={healthchecks.length} canEdit={canEdit}>
                 <HealthcheckList healthchecks={healthchecks.slice(0, PREVIEW)} />
               </KindSection>
@@ -217,11 +218,16 @@ function Summary({ healthchecks, heartbeats }: { healthchecks: HealthcheckSummar
   ];
 
   return (
-    <Section
-      title="Monitoring summary"
-      icon={LayoutDashboard}
-      description="High-signal counts for your healthchecks, heartbeats and alerting."
-    >
+    // On the page's four-column grid, not inside a card, so the cards line up
+    // with the sections below them.
+    <section>
+      <h2 className="flex items-center gap-2 text-base font-bold md:text-lg">
+        <LayoutDashboard className="size-4 shrink-0" />
+        Monitoring summary
+      </h2>
+      <p className="mt-1 mb-4 text-sm text-muted-foreground">
+        High-signal counts for your healthchecks, heartbeats and alerting.
+      </p>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((c) => {
           const tone = tones[c.tone];
@@ -251,6 +257,6 @@ function Summary({ healthchecks, heartbeats }: { healthchecks: HealthcheckSummar
           );
         })}
       </div>
-    </Section>
+    </section>
   );
 }

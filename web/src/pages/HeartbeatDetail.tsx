@@ -62,8 +62,11 @@ export function HeartbeatDetail() {
         />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        {h.source === "kubernetes" ? <CronJobRunsCard h={h} /> : <PingCard h={h} />}
+      {/* The same four columns and gap as the stats above, so the cards line up. */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-4">
+        <div className="min-w-0 lg:col-span-3 [&>*]:h-full">
+          {h.source === "kubernetes" ? <CronJobRunsCard h={h} /> : <PingCard h={h} />}
+        </div>
         <ScheduleCard h={h} upcoming={upcoming} />
       </div>
 
