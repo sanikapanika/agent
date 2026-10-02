@@ -25,7 +25,7 @@ Open http://localhost:8080 and sign in as `admin` with the password from the log
 
 Label what you want monitored. A Service gets an HTTP check on its cluster DNS name, on its pods' readinessProbe path (or a TCP connect for ports that aren't HTTP), an Ingress or HTTPRoute an HTTP check per hostname, and a Deployment, StatefulSet or DaemonSet a readiness check.
 
-Set `discovery.serviceCheck: kubernetes` (or `upti.my/type: kubernetes` on one Service) to reuse the pods' readinessProbes instead: the Service is up while it has a ready endpoint, with no traffic to the app. The default, `probe`, tests the real path through DNS, the Service and the app. Annotations adjust the check:
+Put `upti.my/type: kubernetes` on a Service to reuse its pods' readinessProbes instead: it's up while it has a ready endpoint, with no traffic to the app. Without it, the check tests the real path through DNS, the Service and the app. Annotations adjust the check:
 
 ```yaml
 metadata:
@@ -96,7 +96,6 @@ ingress:
 | `healthchecks` / `heartbeats` | `[]` | Monitors defined in values |
 | `retentionDays` | `30` | How long check results are kept |
 | `discovery.enabled` | `true` | Monitor resources labeled `upti.my/monitor: "true"` |
-| `discovery.serviceCheck` | `probe` | Discovered Services: `probe` (the agent's own request) or `kubernetes` (ready endpoints, from their readinessProbes) |
 | `rbac.create` | `true` | Read-only access for checks (Deployments, StatefulSets, DaemonSets, Services, EndpointSlices) and discovery (listing Services, Ingresses, HTTPRoutes and pods) |
 | `rbac.clusterWide` | `true` | `false` limits that access to the release namespace |
 | `serviceAccount.create` / `.name` | `true` / `""` | Service account for Kubernetes checks |

@@ -50,21 +50,10 @@ var resources = []resource{
 	{"daemonset", "/apis/apps/v1", "daemonsets", fromWorkload("daemonset")},
 }
 
-// How a discovered Service is checked, unless its upti.my/type says.
-const (
-	// ServiceProbe: the agent sends its own request (HTTP or TCP) to the
-	// Service, end to end through DNS and kube-proxy.
-	ServiceProbe = "probe"
-	// ServiceKubernetes: reuse the kubelet's readinessProbes; the Service is
-	// up while it has a ready endpoint. No traffic to the app.
-	ServiceKubernetes = "kubernetes"
-)
-
 // Discoverer scans the cluster for labeled resources.
 type Discoverer struct {
-	kube         *kube.Client
-	log          *slog.Logger
-	serviceCheck string // ServiceProbe or ServiceKubernetes
+	kube *kube.Client
+	log  *slog.Logger
 
 	// probes remembers each Service's readinessProbe (namespace/name), so
 	// its check keeps the same path while it has no pods (scaled to zero,
@@ -84,11 +73,10 @@ type Discoverer struct {
 	warned map[string]bool
 }
 
-// New returns a Discoverer. serviceCheck is ServiceProbe or
-// ServiceKubernetes.
-func New(k *kube.Client, log *slog.Logger, serviceCheck string) *Discoverer {
+// New returns a Discoverer.
+func New(k *kube.Client, log *slog.Logger) *Discoverer {
 	return &Discoverer{
-		kube: k, log: log, serviceCheck: serviceCheck,
+		kube: k, log: log,
 		probes: map[string]probe{}, built: map[string][]monitor.Monitor{},
 		namespaced: map[string]bool{}, warned: map[string]bool{},
 	}
@@ -164,6 +152,10 @@ func (d *Discoverer) list(ctx context.Context, r resource) ([]object, error) {
 			return nil, fmt.Errorf("listing %s: %w", r.name, err)
 		}
 		d.namespaced[r.name] = true
+		if !d.warned["namespaced"] {
+			d.warned["namespaced"] = true
+			d.log.Info("kubernetes discovery: not allowed to list cluster-wide, so only namespace " + d.kube.Namespace() + " is scanned")
+		}
 	}
 	if d.kube.Namespace() == "" {
 		return nil, nil

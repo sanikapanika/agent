@@ -102,7 +102,7 @@ metadata:
     upti.my/path: /health
 ```
 
-A Service can be checked two ways. **Probe** (the default) is the agent's own request, end to end through DNS, the Service and the app, as described above. **Kubernetes** reuses the kubelet's readinessProbes instead: the Service is up while it has a ready endpoint, and the agent sends the app no traffic. It works on any port and protocol, but only knows what the readinessProbe tests. Set it per Service with `upti.my/type: kubernetes`, or for the whole cluster with `discovery.serviceCheck: kubernetes` in the chart (`KUBERNETES_DISCOVERY_SERVICE_CHECK`). You can also add a Service check by hand: a Kubernetes healthcheck on `<namespace>/service/<name>`.
+By default the agent checks a Service with its own request, end to end through DNS, the Service and the app, as described above. With `upti.my/type: kubernetes` it reuses the kubelet's readinessProbes instead: the Service is up while it has a ready endpoint, and the agent sends the app no traffic. That works on any port and protocol, but only knows what the readinessProbe tests. You can also add one by hand: a Kubernetes healthcheck on `<namespace>/service/<name>`.
 
 Annotations adjust what's checked:
 
@@ -138,7 +138,6 @@ Environment variables set how the agent runs, its secrets, and (optionally) moni
 | `MONITORS_FILE` | – | Path to a YAML file of monitors |
 | `MONITORS_YAML` | – | The YAML itself, for platforms where mounting files is awkward |
 | `KUBERNETES_DISCOVERY` | `true` | Create monitors for resources labeled `upti.my/monitor: "true"` (see [Auto-discovery](#auto-discovery)). Only applies inside a cluster |
-| `KUBERNETES_DISCOVERY_SERVICE_CHECK` | `probe` | How discovered Services are checked: `probe` (the agent's own request) or `kubernetes` (their ready endpoints) |
 | `RETENTION_DAYS` | `30` | How long check results, heartbeat runs and events are kept |
 | `UPTIMY_HEARTBEAT_URL` | – | Optional. Pins the [Watch the watcher](#watch-the-watcher) heartbeat, for agents without a persistent volume; otherwise connect it in the UI |
 | `AGENT_NAME` | hostname | How this agent is labeled in Uptimy |

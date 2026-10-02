@@ -94,10 +94,6 @@ func (f *fakeAPI) set(path, body string) {
 }
 
 func newFake(t *testing.T) (*fakeAPI, *Discoverer) {
-	return newFakeMode(t, ServiceProbe)
-}
-
-func newFakeMode(t *testing.T, serviceCheck string) (*fakeAPI, *Discoverer) {
 	f := &fakeAPI{responses: map[string]string{
 		"/api/v1/services":                         services,
 		"/apis/networking.k8s.io/v1/ingresses":     ingresses,
@@ -111,7 +107,7 @@ func newFakeMode(t *testing.T, serviceCheck string) (*fakeAPI, *Discoverer) {
 	}, status: map[string]int{}}
 	srv := httptest.NewServer(f)
 	t.Cleanup(srv.Close)
-	return f, New(kube.New(srv.URL, "monitoring"), slog.New(slog.NewTextHandler(io.Discard, nil)), serviceCheck)
+	return f, New(kube.New(srv.URL, "monitoring"), slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
 func byName(ds []managed.Desired) map[string]monitor.Check {
@@ -238,23 +234,6 @@ func TestSyncKeepsPause(t *testing.T) {
 	f.set("/apis/networking.k8s.io/v1/ingresses", `{"items":[]}`)
 	if ch := rescan(); len(ch.Deleted) != 2 || len(ch.Saved) != 0 {
 		t.Fatalf("got %+v", ch)
-	}
-}
-
-// In kubernetes mode Services are checked by their ready endpoints, unless
-// their annotations ask for an HTTP check.
-func TestDiscoverKubernetesMode(t *testing.T) {
-	_, d := newFakeMode(t, ServiceKubernetes)
-	ds, err := d.Discover(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := byName(ds)
-	if c := got["shop/checkout"]; c.Type != monitor.TypeKubernetes || c.Target != "shop/service/checkout" {
-		t.Errorf("checkout: %s %s", c.Type, c.Target)
-	}
-	if c := got["shop/api"]; c.Type != monitor.TypeHTTP {
-		t.Errorf("api has upti.my/path, so it stays HTTP: %s", c.Type)
 	}
 }
 

@@ -80,11 +80,11 @@ type servicePort struct {
 	AppProtocol string      `json:"appProtocol"`
 }
 
-// fromService checks a Service. In probe mode the agent sends its own
-// request to the Service's cluster DNS name: HTTP on the pods'
-// readinessProbe path when they have one, or when the port looks like HTTP,
-// otherwise a TCP connect. In kubernetes mode it reuses the kubelet's
-// readinessProbes: up while the Service has a ready endpoint.
+// fromService checks a Service. By default the agent sends its own request
+// to the Service's cluster DNS name: HTTP on the pods' readinessProbe path
+// when they have one, or when the port looks like HTTP, otherwise a TCP
+// connect. With upti.my/type: kubernetes it reuses the kubelet's
+// readinessProbes instead: up while the Service has a ready endpoint.
 func (d *Discoverer) fromService(ctx context.Context, o object) ([]monitor.Monitor, error) {
 	opts, err := parseOptions(o)
 	if err != nil {
@@ -103,9 +103,6 @@ func (d *Discoverer) fromService(ctx context.Context, o object) ([]monitor.Monit
 	}
 
 	typ := opts.typ
-	if typ == "" && opts.path == "" && opts.scheme == "" && d.serviceCheck == ServiceKubernetes {
-		typ = "kubernetes"
-	}
 	if typ == "kubernetes" {
 		target := o.Metadata.Namespace + "/service/" + o.Metadata.Name
 		return []monitor.Monitor{healthcheck(name, &monitor.Check{Type: monitor.TypeKubernetes, Target: target, IntervalSeconds: opts.interval})}, nil
