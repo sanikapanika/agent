@@ -15,11 +15,11 @@ import (
 )
 
 const cronJobs = `{"items":[
- {"metadata":{"name":"backup","namespace":"shop","uid":"cj-1"},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"backup","namespace":"shop","uid":"cj-1"},
   "spec":{"schedule":"0 3 * * *","timeZone":"Europe/Berlin","jobTemplate":{"spec":{"activeDeadlineSeconds":600}}}},
- {"metadata":{"name":"sync","namespace":"shop","uid":"cj-2","annotations":{"upti.my/name":"Product sync"}},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"sync","namespace":"shop","uid":"cj-2","annotations":{"upti.my/name":"Product sync"}},
   "spec":{"schedule":"*/5 * * * *"}},
- {"metadata":{"name":"report","namespace":"shop","uid":"cj-3"},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"report","namespace":"shop","uid":"cj-3"},
   "spec":{"schedule":"0 9 * * 1","suspend":true}}
 ]}`
 
@@ -36,14 +36,14 @@ func ts(t time.Time) string { return t.UTC().Format(time.RFC3339) }
 // completed, and one that failed.
 func jobsJSON(old, start, done, failStart, failed time.Time) string {
 	return fmt.Sprintf(`{"items":[
- {"metadata":{"name":"backup-1","uid":"j-1","ownerReferences":[{"uid":"cj-1"}]},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"backup-1","uid":"j-1","ownerReferences":[{"uid":"cj-1"}]},
   "status":{"startTime":%q,"conditions":[{"type":"Complete","status":"True","lastTransitionTime":%q}]}},
- {"metadata":{"name":"backup-2","uid":"j-2","ownerReferences":[{"uid":"cj-1"}]},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"backup-2","uid":"j-2","ownerReferences":[{"uid":"cj-1"}]},
   "status":{"startTime":%q,"conditions":[{"type":"SuccessCriteriaMet","status":"True","lastTransitionTime":%q},
                                          {"type":"Complete","status":"True","lastTransitionTime":%q}]}},
- {"metadata":{"name":"backup-3","uid":"j-3","ownerReferences":[{"uid":"cj-1"}]},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"backup-3","uid":"j-3","ownerReferences":[{"uid":"cj-1"}]},
   "status":{"startTime":%q,"conditions":[{"type":"Failed","status":"True","reason":"BackoffLimitExceeded","message":"Job has reached the specified backoff limit","lastTransitionTime":%q}]}},
- {"metadata":{"name":"other","uid":"j-9","ownerReferences":[{"uid":"someone-else"}]},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"other","uid":"j-9","ownerReferences":[{"uid":"someone-else"}]},
   "status":{"startTime":%q}}
 ]}`, ts(old), ts(old.Add(time.Minute)), ts(start), ts(done), ts(done), ts(failStart), ts(failed), ts(start))
 }

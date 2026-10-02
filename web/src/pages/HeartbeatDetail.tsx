@@ -13,7 +13,7 @@ import { CopyField } from "@/components/ui/copy-button";
 import { ErrorNote, PageHeader } from "@/components/Layout";
 import { DailyBars, HeartbeatDot, HeartbeatStateLabel, RunBars, runOutcome, runTime } from "@/components/status";
 import { BackLink, EventsCard, MonitorActions, Stat } from "@/components/MonitorPage";
-import { managedLabel } from "@/components/MonitorEmpty";
+import { managedBadge } from "@/components/MonitorEmpty";
 import { useCanEdit } from "@/components/AuthGate";
 
 export function HeartbeatDetail() {
@@ -39,7 +39,7 @@ export function HeartbeatDetail() {
             <Badge>Heartbeat</Badge>
             <span>{h.schedule}</span>
             <span>· {formatDuration(h.heartbeat.grace_seconds * 1000)} grace</span>
-            {h.source !== "ui" && <Badge>{managedLabel[h.source]}</Badge>}
+            {h.source !== "ui" && <Badge>{managedBadge(h)}</Badge>}
           </span>
         }
         actions={<MonitorActions m={h} />}

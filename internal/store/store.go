@@ -193,6 +193,10 @@ var migrations = []string{
 		last_used_at INTEGER
 	);
 	CREATE INDEX api_tokens_user ON api_tokens(user_id);`,
+
+	// 3: what a monitor from outside the UI was made from (a Kubernetes
+	// object), so renaming it keeps its history.
+	`ALTER TABLE monitors ADD COLUMN source_ref TEXT NOT NULL DEFAULT '';`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {

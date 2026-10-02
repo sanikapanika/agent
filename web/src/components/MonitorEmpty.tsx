@@ -1,8 +1,11 @@
 import { Link } from "react-router";
+import { useQuery } from "@tanstack/react-query";
 import { FileCode2, Plus, ShipWheel, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { kinds, type MonitorKind } from "@/lib/monitors";
-import type { MonitorSource } from "@/lib/api";
+import { api, type MonitorSource } from "@/lib/api";
+import { describeRef, MONITOR_LABEL } from "@/lib/kubernetes";
+import { CopyField } from "@/components/ui/copy-button";
 import { buttonVariants } from "@/components/ui/button";
 import { useCanEdit } from "@/components/AuthGate";
 
@@ -17,10 +20,18 @@ const emptyCopy: Record<MonitorKind, { title: string; body: string }> = {
   },
 };
 
+// Inside a cluster, the empty state says monitors can come from labels.
+const discoveryCopy: Record<MonitorKind, { what: string; example: string }> = {
+  healthcheck: { what: "a Service, Ingress or Deployment", example: "service checkout" },
+  heartbeat: { what: "a CronJob", example: "cronjob backup" },
+};
+
 /** The empty state of a healthcheck or heartbeat list. */
 export function MonitorEmpty({ kind, compact }: { kind: MonitorKind; compact?: boolean }) {
   const canEdit = useCanEdit();
   const copy = emptyCopy[kind];
+  const info = useQuery({ queryKey: ["info"], queryFn: api.info });
+  const discovery = info.data?.discovery ?? false;
   return (
     <div
       className={cn(
@@ -30,6 +41,26 @@ export function MonitorEmpty({ kind, compact }: { kind: MonitorKind; compact?: b
     >
       <h3 className="font-semibold">{copy.title}</h3>
       <p className="max-w-md text-sm text-muted-foreground">{copy.body}</p>
+      {discovery && !compact && (
+        <div className="mt-2 flex w-full max-w-lg flex-col gap-2 text-left">
+          <p className="text-sm">
+            <ShipWheel className="mr-1.5 inline size-4 align-[-3px]" />
+            This agent runs in Kubernetes: label {discoveryCopy[kind].what} and it shows up here within 30 seconds.
+          </p>
+          <CopyField text={`kubectl -n <namespace> label ${discoveryCopy[kind].example} ${MONITOR_LABEL}=true`} />
+          <Link to="/settings/kubernetes" className="text-sm underline underline-offset-2">
+            See what's in the cluster
+          </Link>
+        </div>
+      )}
+      {discovery && compact && (
+        <p className="max-w-md text-sm text-muted-foreground">
+          Or label {discoveryCopy[kind].what} <code className="rounded bg-muted px-1">{MONITOR_LABEL}=true</code>.{" "}
+          <Link to="/settings/kubernetes" className="underline underline-offset-2">
+            Cluster resources
+          </Link>
+        </p>
+      )}
       {!compact && (
         <p className="max-w-md text-sm text-muted-foreground">
           You can also define them in YAML with <code className="rounded bg-muted px-1">MONITORS_FILE</code>.
@@ -47,7 +78,13 @@ export function MonitorEmpty({ kind, compact }: { kind: MonitorKind; compact?: b
   );
 }
 
-/** Marks a monitor defined in the monitors file. */
+/** "Discovered in Kubernetes · service shop/checkout", for a monitor's page. */
+export function managedBadge(m: { source: MonitorSource; source_ref?: string }) {
+  if (m.source === "ui") return "";
+  const label = managedLabel[m.source];
+  return m.source_ref ? `${label} · ${describeRef(m.source_ref)}` : label;
+}
+
 /** How a monitor defined outside the UI is labeled; edit it at its source. */
 export const managedLabel: Record<Exclude<MonitorSource, "ui">, string> = {
   file: "Managed by monitors file",

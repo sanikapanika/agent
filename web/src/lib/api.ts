@@ -41,6 +41,8 @@ export interface Monitor {
   name: string;
   paused: boolean;
   source: MonitorSource;
+  /** For a discovered monitor, the object it came from: "service/shop/checkout". */
+  source_ref?: string;
   // Status page placement, set in its editor.
   public: boolean;
   status_label: string;
@@ -274,11 +276,40 @@ export interface KumaImportResult {
 export interface Info {
   version: string;
   kubernetes: boolean;
+  /** Kubernetes discovery is running (in a cluster, not turned off). */
+  discovery: boolean;
   uptimy_heartbeat: boolean;
   status_page_enabled: boolean;
   status_page_title: string;
   monitors_file: boolean;
   retention_days: number;
+}
+
+/** How Kubernetes discovery is doing: its last scan and what it couldn't use. */
+export interface DiscoveryStatus {
+  /** "cluster", or "namespace <name>" when RBAC limits it. */
+  scope: string;
+  last_scan?: string;
+  error?: string;
+  monitors: number;
+  warnings: string[];
+}
+
+/** An object discovery could monitor, labeled or not. */
+export interface KubeResource {
+  kind: string;
+  namespace: string;
+  name: string;
+  /** Its upti.my/monitor value, if it has one, and what that means. */
+  label?: string;
+  label_state: "in" | "out" | "invalid" | "";
+  monitors: { id: number; kind: MonitorKind; name: string }[];
+}
+
+export interface KubeResources {
+  items: KubeResource[];
+  /** Kinds with more objects than were listed. */
+  truncated: string[];
 }
 
 export interface UptimyCheckIn {
@@ -481,6 +512,8 @@ export const api = {
   createHeartbeat: (h: HeartbeatInput) => request<Heartbeat>("POST", "/api/heartbeats", h),
   updateHeartbeat: (id: number, h: HeartbeatInput) => request<Heartbeat>("PUT", `/api/heartbeats/${id}`, h),
   rotateToken: (id: number) => request<Heartbeat>("POST", `/api/heartbeats/${id}/token`),
+  discoveryStatus: () => request<DiscoveryStatus>("GET", "/api/kubernetes/discovery"),
+  kubeResources: () => request<KubeResources>("GET", "/api/kubernetes/resources"),
   runs: (id: number, limit = 100) => request<Run[]>("GET", `/api/heartbeats/${id}/runs?limit=${limit}`),
   previewSchedule: (spec: Omit<HeartbeatSpec, "token">) =>
     request<SchedulePreview>("POST", "/api/heartbeats/preview", spec),

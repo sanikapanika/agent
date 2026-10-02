@@ -87,9 +87,11 @@ func run(log *slog.Logger) error {
 	if err := sched.Start(ctx); err != nil {
 		return fmt.Errorf("start scheduler: %w", err)
 	}
+	var disc *discovery.Discoverer
 	if kc != nil && cfg.KubernetesDiscovery {
-		log.Info("kubernetes discovery enabled", "label", discovery.Label+"=true")
-		go discovery.New(kc, log).Run(ctx, st, func(ch managed.Changes) {
+		log.Info("kubernetes discovery enabled", "label", discovery.Label)
+		disc = discovery.New(kc, log)
+		go disc.Run(ctx, st, func(ch managed.Changes) {
 			for _, id := range ch.Deleted {
 				sched.Remove(id)
 			}
@@ -116,7 +118,7 @@ func run(log *slog.Logger) error {
 
 	srv := &api.Server{
 		Config: cfg, Version: version, Store: st, Scheduler: sched,
-		Sender: sender, Hub: hub, Log: log, Watchdog: watchdog, KubeAvailable: kc != nil,
+		Sender: sender, Hub: hub, Log: log, Watchdog: watchdog, KubeAvailable: kc != nil, Discovery: disc,
 	}
 	srv.RestorePaused(ctx)
 	go watchdog.Run(ctx)

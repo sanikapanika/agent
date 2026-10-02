@@ -18,6 +18,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/uptimy/agent/internal/kube"
@@ -26,9 +29,22 @@ import (
 	"github.com/uptimy/agent/internal/store"
 )
 
-// Label opts a resource in. A label rather than an annotation, so the API
-// server does the filtering and large clusters stay cheap to scan.
+// Label opts a resource in: "true" (or "yes", "1", "on"). "false" (or "no",
+// "0", "off") opts it out explicitly; any other value is reported. A label
+// rather than an annotation, so the API server does the filtering and large
+// clusters stay cheap to scan.
 const Label = "upti.my/monitor"
+
+// optIn says what a value of Label means: in, out, or a mistake.
+func optIn(value string) (in, valid bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "yes", "1", "on":
+		return true, true
+	case "false", "no", "0", "off":
+		return false, true
+	}
+	return false, false
+}
 
 // Interval is how often the cluster is scanned.
 const Interval = 30 * time.Second
@@ -55,6 +71,12 @@ var resources = []resource{
 type Discoverer struct {
 	kube *kube.Client
 	log  *slog.Logger
+
+	// mu guards what the API reads while scans run: status and namespaced.
+	mu     sync.Mutex
+	status Status
+	// warnings found by the scan in progress, and by the last Job read.
+	scanWarnings, jobWarnings []string
 
 	// probes remembers each Service's readinessProbe (namespace/name), so
 	// its check keeps the same path while it has no pods (scaled to zero,
@@ -83,6 +105,7 @@ func New(k *kube.Client, log *slog.Logger) *Discoverer {
 		kube: k, log: log,
 		probes: map[string]probe{}, built: map[string][]monitor.Monitor{},
 		jobs:       jobTracker{seen: map[string]*seenJob{}, since: map[int64]time.Time{}},
+		status:     Status{Scope: "cluster"},
 		namespaced: map[string]bool{}, warned: map[string]bool{},
 	}
 }
@@ -97,24 +120,36 @@ type scanError struct{ error }
 // monitors.
 func (d *Discoverer) Discover(ctx context.Context) ([]managed.Desired, error) {
 	var out []managed.Desired
-	seen := map[string]string{}             // monitor name → resource it came from
 	built := map[string][]monitor.Monitor{} // replaces d.built once the scan completes
 	var cronJobs []cronJobRef
+	d.scanWarnings = nil
 	for _, r := range resources {
 		items, err := d.list(ctx, r)
 		if err != nil {
+			d.finishScan(0, err)
 			return nil, err
 		}
 		for _, o := range items {
 			from := fmt.Sprintf("%s %s/%s", r.kind, o.Metadata.Namespace, o.Metadata.Name)
+			in, valid := optIn(o.Metadata.Labels[Label])
+			if !valid {
+				d.warn(fmt.Sprintf("%s: %s is %q; set it to \"true\" to monitor it", from, Label, o.Metadata.Labels[Label]))
+			}
+			if !in {
+				continue
+			}
 			ms, err := r.build(d, ctx, o)
 			var se scanError
 			if errors.As(err, &se) {
+				d.finishScan(0, se.error)
 				return nil, se.error
 			}
 			if err == nil {
 				for i := range ms {
 					ms[i].Source = monitor.SourceKubernetes
+					// Which object it came from, plus the hostname for
+					// Ingresses and HTTPRoutes ("#shop.example.com").
+					ms[i].SourceRef = fmt.Sprintf("%s/%s/%s%s", r.kind, o.Metadata.Namespace, o.Metadata.Name, ms[i].SourceRef)
 					if err = ms[i].Normalize(); err != nil {
 						break
 					}
@@ -132,11 +167,6 @@ func (d *Discoverer) Discover(ctx context.Context) ([]managed.Desired, error) {
 			prev := d.built[from]
 			built[from] = ms
 			for i, m := range ms {
-				if other, dup := seen[m.Name]; dup {
-					d.warn(fmt.Sprintf("%s: %s also wants the name %q; set %s/name on one of them", from, other, m.Name, prefix))
-					continue
-				}
-				seen[m.Name] = from
 				ds := managed.Desired{Monitor: m, GeneratedToken: m.Kind == monitor.KindHeartbeat}
 				// A suspended CronJob pauses its heartbeat, and resuming it
 				// resumes the heartbeat. Otherwise a pause set in the UI stays.
@@ -148,51 +178,93 @@ func (d *Discoverer) Discover(ctx context.Context) ([]managed.Desired, error) {
 				}
 				out = append(out, ds)
 				if r.kind == "cronjob" {
-					cronJobs = append(cronJobs, cronJobRef{namespace: o.Metadata.Namespace, name: o.Metadata.Name, uid: o.Metadata.UID, monitor: m.Name})
+					cronJobs = append(cronJobs, cronJobRef{namespace: o.Metadata.Namespace, name: o.Metadata.Name, uid: o.Metadata.UID, ref: m.SourceRef})
 				}
 			}
 		}
 	}
 	d.built, d.cronJobs = built, cronJobs
+	d.finishScan(len(out), nil)
 	return out, nil
 }
 
-func (d *Discoverer) list(ctx context.Context, r resource) ([]object, error) {
-	selector := "?labelSelector=" + url.QueryEscape(Label+"=true")
+// errForbidden: RBAC doesn't allow listing this resource, even in the
+// agent's namespace.
+var errForbidden = errors.New("forbidden")
+
+// get lists r with query, cluster-wide when clusterWide is set, falling back
+// to the agent's namespace when that's forbidden (the chart's
+// rbac.clusterWide=false). It reports whether it fell back. Resource types
+// the cluster doesn't have (no Gateway API) list as empty.
+func (d *Discoverer) get(ctx context.Context, r resource, query string, clusterWide bool) (items []object, fellBack bool, err error) {
 	var l objectList
-	if !d.namespaced[r.name] {
-		err := d.kube.Get(ctx, r.group+"/"+r.name+selector, &l)
+	if clusterWide {
+		err := d.kube.Get(ctx, r.group+"/"+r.name+query, &l)
 		switch {
 		case err == nil:
-			return l.Items, nil
+			return l.Items, false, nil
 		case kube.IsNotFound(err):
-			return nil, nil // e.g. Gateway API isn't installed
+			return nil, false, nil
 		case !kube.IsForbidden(err):
-			return nil, fmt.Errorf("listing %s: %w", r.name, err)
+			return nil, false, fmt.Errorf("listing %s: %w", r.name, err)
 		}
+		fellBack = true
+	}
+	if d.kube.Namespace() == "" {
+		return nil, fellBack, nil
+	}
+	err = d.kube.Get(ctx, r.group+"/namespaces/"+d.kube.Namespace()+"/"+r.name+query, &l)
+	switch {
+	case err == nil:
+		return l.Items, fellBack, nil
+	case kube.IsNotFound(err):
+		return nil, fellBack, nil
+	case kube.IsForbidden(err):
+		return nil, fellBack, errForbidden
+	}
+	return nil, fellBack, fmt.Errorf("listing %s: %w", r.name, err)
+}
+
+// list returns r's objects that have the label, whatever its value.
+func (d *Discoverer) list(ctx context.Context, r resource) ([]object, error) {
+	d.mu.Lock()
+	clusterWide := !d.namespaced[r.name]
+	d.mu.Unlock()
+	items, fellBack, err := d.get(ctx, r, "?labelSelector="+url.QueryEscape(Label), clusterWide)
+	if fellBack {
+		d.mu.Lock()
 		d.namespaced[r.name] = true
+		d.status.Scope = "namespace " + d.kube.Namespace()
+		d.mu.Unlock()
 		if !d.warned["namespaced"] {
 			d.warned["namespaced"] = true
 			d.log.Info("kubernetes discovery: not allowed to list cluster-wide, so only namespace " + d.kube.Namespace() + " is scanned")
 		}
 	}
-	if d.kube.Namespace() == "" {
-		return nil, nil
-	}
-	err := d.kube.Get(ctx, r.group+"/namespaces/"+d.kube.Namespace()+"/"+r.name+selector, &l)
-	switch {
-	case err == nil:
-		return l.Items, nil
-	case kube.IsNotFound(err):
-		return nil, nil
-	case kube.IsForbidden(err):
+	if errors.Is(err, errForbidden) {
 		d.warn(fmt.Sprintf("not allowed to list %s; give the agent's service account list access to discover them", r.name))
 		return nil, nil
 	}
-	return nil, fmt.Errorf("listing %s: %w", r.name, err)
+	return items, err
 }
 
+// warn reports a problem: in the log once, and in the status for as long
+// as it lasts.
 func (d *Discoverer) warn(msg string) {
+	if !slices.Contains(d.scanWarnings, msg) {
+		d.scanWarnings = append(d.scanWarnings, msg)
+	}
+	if !d.warned[msg] {
+		d.warned[msg] = true
+		d.log.Warn("kubernetes discovery: " + msg)
+	}
+}
+
+// warnJobs is warn for reading Jobs, which runs between scans.
+func (d *Discoverer) warnJobs(msg string) {
+	if !slices.Contains(d.jobWarnings, msg) {
+		d.jobWarnings = append(d.jobWarnings, msg)
+	}
 	if !d.warned[msg] {
 		d.warned[msg] = true
 		d.log.Warn("kubernetes discovery: " + msg)

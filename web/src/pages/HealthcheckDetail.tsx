@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { ErrorNote, PageHeader } from "@/components/Layout";
 import { ResultBars, StatusDot, StatusLabel } from "@/components/status";
 import { BackLink, EventsCard, MonitorActions, Stat } from "@/components/MonitorPage";
-import { managedLabel } from "@/components/MonitorEmpty";
+import { managedBadge } from "@/components/MonitorEmpty";
 
 const ranges = [
   { hours: 1, label: "1h" },
@@ -63,7 +63,7 @@ export function HealthcheckDetail() {
             <Badge>{typeLabel(h.check.type)}</Badge>
             {h.target && <span className="break-all">{h.target}</span>}
             <span>· every {formatInterval(h.check.interval_seconds)}</span>
-            {h.source !== "ui" && <Badge>{managedLabel[h.source]}</Badge>}
+            {h.source !== "ui" && <Badge>{managedBadge(h)}</Badge>}
           </span>
         }
         actions={

@@ -28,7 +28,7 @@ type Report func(heartbeatID int64, signal scheduler.Signal, at time.Time, messa
 
 type cronJobRef struct {
 	namespace, name, uid string
-	monitor              string // the heartbeat's name
+	ref                  string // the heartbeat's SourceRef
 }
 
 type jobTracker struct {
@@ -101,6 +101,8 @@ type jobEvent struct {
 
 // trackJobs reports the runs of discovered CronJobs that it hasn't yet.
 func (d *Discoverer) trackJobs(ctx context.Context, st *store.Store, report Report) error {
+	d.jobWarnings = nil
+	defer d.publishWarnings()
 	if len(d.cronJobs) == 0 {
 		return nil
 	}
@@ -108,16 +110,16 @@ func (d *Discoverer) trackJobs(ctx context.Context, st *store.Store, report Repo
 	if err != nil {
 		return err
 	}
-	heartbeats := map[string]monitor.Monitor{}
+	heartbeats := map[string]monitor.Monitor{} // by SourceRef
 	for _, m := range all {
 		if m.Source == monitor.SourceKubernetes && m.Kind == monitor.KindHeartbeat {
-			heartbeats[m.Name] = m
+			heartbeats[m.SourceRef] = m
 		}
 	}
 	jobsIn := map[string][]job{} // by namespace
 	live := map[string]bool{}    // Job UIDs that still exist
 	for _, ref := range d.cronJobs {
-		m, ok := heartbeats[ref.monitor]
+		m, ok := heartbeats[ref.ref]
 		if !ok {
 			continue // not saved yet
 		}
@@ -129,7 +131,7 @@ func (d *Discoverer) trackJobs(ctx context.Context, st *store.Store, report Repo
 			err := d.kube.Get(ctx, "/apis/batch/v1/namespaces/"+ref.namespace+"/jobs", &l)
 			switch {
 			case kube.IsForbidden(err):
-				d.warn("not allowed to list jobs in " + ref.namespace + ", so CronJob runs can't be read; give the agent's service account list access to jobs")
+				d.warnJobs("not allowed to list jobs in " + ref.namespace + ", so CronJob runs can't be read; give the agent's service account list access to jobs")
 				continue
 			case err != nil:
 				return fmt.Errorf("listing jobs in %s: %w", ref.namespace, err)

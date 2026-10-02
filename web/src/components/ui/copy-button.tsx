@@ -5,7 +5,7 @@ import { Button } from "./button";
 import { toast } from "./toast";
 
 /** An icon button that copies text and shows a check mark for a moment. */
-function CopyButton({ text, label = "Copy", className }: { text: string; label?: string; className?: string }) {
+export function CopyButton({ text, label = "Copy", className }: { text: string; label?: string; className?: string }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
@@ -38,7 +38,9 @@ function CopyButton({ text, label = "Copy", className }: { text: string; label?:
 export function CopyField({ text, children, label }: { text: string; children?: React.ReactNode; label?: string }) {
   return (
     <div className="flex items-start gap-1 rounded-md border bg-muted/50 py-1 pr-1 pl-3">
-      <code className="min-w-0 flex-1 py-1 text-sm break-all whitespace-pre-wrap">{children ?? text}</code>
+      <code className="min-w-0 flex-1 py-1 text-sm whitespace-pre-wrap [overflow-wrap:anywhere]">
+        {children ?? text}
+      </code>
       <CopyButton text={text} label={label} />
     </div>
   );

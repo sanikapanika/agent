@@ -13,6 +13,7 @@ import { HeartbeatDetail } from "@/pages/HeartbeatDetail";
 import { Notifications } from "@/pages/Notifications";
 import { MaintenancePage } from "@/pages/Maintenance";
 import { Settings } from "@/pages/Settings";
+import { KubernetesPage } from "@/pages/Kubernetes";
 import { Users } from "@/pages/Users";
 import { Account } from "@/pages/Account";
 import { StatusPageEditor } from "@/pages/StatusPageEditor";
@@ -95,6 +96,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="users" element={<Users />} />
             <Route path="status-page" element={<StatusPageEditor />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="settings/kubernetes" element={<KubernetesPage />} />
             <Route path="account" element={<Account />} />
             <Route path="uptimy/connected" element={<UptimyConnected />} />
           </Route>

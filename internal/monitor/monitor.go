@@ -52,6 +52,10 @@ type Monitor struct {
 	Name   string `json:"name"`
 	Paused bool   `json:"paused"`
 	Source string `json:"source"`
+	// SourceRef is what the source made it from, for monitors that aren't
+	// from the UI or the file: "service/shop/checkout". It identifies the
+	// monitor across renames.
+	SourceRef string `json:"source_ref,omitempty"`
 
 	// On the status page.
 	Public        bool   `json:"public"`

@@ -1,7 +1,8 @@
 // Package managed keeps monitors that are defined outside the UI (in the
 // monitors file, or discovered in Kubernetes) in step with the store. Each
-// source owns its monitors, matched by name; monitors from the UI or another
-// source are never touched.
+// source owns its monitors, matched by SourceRef when the source sets one
+// (so a rename keeps the history) and by name otherwise; monitors from the
+// UI or another source are never touched.
 package managed
 
 import (
@@ -40,29 +41,48 @@ type Changes struct {
 // Empty reports whether nothing changed.
 func (c Changes) Empty() bool { return len(c.Saved) == 0 && len(c.Deleted) == 0 }
 
-// Sync makes source's monitors in the store match desired, matching by name,
-// and only writes the ones that changed.
+// Sync makes source's monitors in the store match desired, and only writes
+// the ones that changed.
 func Sync(ctx context.Context, st *store.Store, source string, desired []Desired, opts Options) (Changes, error) {
 	var ch Changes
 	existing, err := st.ListMonitors(ctx)
 	if err != nil {
 		return ch, err
 	}
-	byName := map[string]monitor.Monitor{}
+	byName, byRef := map[string]monitor.Monitor{}, map[string]monitor.Monitor{}
+	left := map[int64]monitor.Monitor{} // not desired anymore, unless matched below
 	for _, m := range existing {
 		if m.Source == source {
 			byName[m.Name] = m
+			if m.SourceRef != "" {
+				byRef[m.SourceRef] = m
+			}
+			left[m.ID] = m
 		}
 	}
 	for _, d := range desired {
 		d.Source = source
-		cur, ok := byName[d.Name]
+		cur, ok := byRef[d.SourceRef]
+		if d.SourceRef == "" {
+			cur, ok = byName[d.Name]
+		} else if !ok {
+			// Saved before monitors had a ref: match it by name once.
+			if c, found := byName[d.Name]; found && c.SourceRef == "" {
+				cur, ok = c, true
+			}
+		}
+		if ok {
+			if _, free := left[cur.ID]; !free {
+				ok = false // already taken by another desired monitor
+			}
+		}
 		if ok && cur.Kind != d.Kind {
 			// Switched between healthcheck and heartbeat: a different monitor.
 			if err := st.DeleteMonitor(ctx, cur.ID); err != nil {
 				return ch, err
 			}
 			ch.Deleted = append(ch.Deleted, cur.ID)
+			delete(left, cur.ID)
 			ok = false
 		}
 		if !ok {
@@ -74,7 +94,7 @@ func Sync(ctx context.Context, st *store.Store, source string, desired []Desired
 			ch.Saved = append(ch.Saved, m)
 			continue
 		}
-		delete(byName, d.Name)
+		delete(left, cur.ID)
 		m := d.Monitor
 		m.ID, m.CreatedAt, m.UpdatedAt = cur.ID, cur.CreatedAt, cur.UpdatedAt
 		// The status page editor owns whether and how it's shown; the
@@ -99,7 +119,7 @@ func Sync(ctx context.Context, st *store.Store, source string, desired []Desired
 		ch.Updated++
 		ch.Saved = append(ch.Saved, saved)
 	}
-	for _, m := range byName {
+	for _, m := range left {
 		if err := st.DeleteMonitor(ctx, m.ID); err != nil {
 			return ch, err
 		}

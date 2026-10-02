@@ -27,6 +27,7 @@ type object struct {
 		Name        string            `json:"name"`
 		Namespace   string            `json:"namespace"`
 		UID         string            `json:"uid"`
+		Labels      map[string]string `json:"labels"`
 		Annotations map[string]string `json:"annotations"`
 	} `json:"metadata"`
 	Spec json.RawMessage `json:"spec"`
@@ -259,7 +260,9 @@ func fromHosts(o object, hosts []string, scheme func(host string) string) ([]mon
 				name += " (" + h + ")"
 			}
 		}
-		out = append(out, healthcheck(name, opts.httpCheck(s+"://"+h+path)))
+		m := healthcheck(name, opts.httpCheck(s+"://"+h+path))
+		m.SourceRef = "#" + h // one monitor per hostname
+		out = append(out, m)
 	}
 	return out, nil
 }

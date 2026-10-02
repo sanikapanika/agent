@@ -12,7 +12,7 @@ import (
 
 // A monitor is a row in monitors plus its settings in healthchecks or
 // heartbeats; reads join them back together.
-const selectMonitors = `SELECT m.id, m.kind, m.name, m.paused, m.source,
+const selectMonitors = `SELECT m.id, m.kind, m.name, m.paused, m.source, m.source_ref,
 		m.public, m.status_label, m.status_order, m.status_section, m.created_at, m.updated_at,
 		h.type, h.target, h.interval_seconds, h.timeout_seconds, h.failure_threshold, h.config,
 		b.token, b.every_seconds, b.cron, b.timezone, b.grace_seconds
@@ -33,7 +33,7 @@ func scanMonitor(row scanner) (monitor.Monitor, error) {
 		bToken, bCron, bZone sql.NullString
 		bEvery, bGrace       sql.NullInt64
 	)
-	err := row.Scan(&m.ID, &m.Kind, &m.Name, &m.Paused, &m.Source,
+	err := row.Scan(&m.ID, &m.Kind, &m.Name, &m.Paused, &m.Source, &m.SourceRef,
 		&m.Public, &m.StatusLabel, &m.StatusOrder, &m.StatusSection, &created, &updated,
 		&hType, &hTarget, &hInterval, &hTimeout, &hThresholds, &hConfig,
 		&bToken, &bEvery, &bCron, &bZone, &bGrace)
@@ -92,8 +92,8 @@ func (s *Store) CreateMonitor(ctx context.Context, m monitor.Monitor) (monitor.M
 	now := time.Now().UTC()
 	err := s.inTx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.ExecContext(ctx, `INSERT INTO monitors
-			(kind, name, paused, source, public, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			m.Kind, m.Name, m.Paused, m.Source, m.Public, now.UnixMilli(), now.UnixMilli())
+			(kind, name, paused, source, source_ref, public, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			m.Kind, m.Name, m.Paused, m.Source, m.SourceRef, m.Public, now.UnixMilli(), now.UnixMilli())
 		if err != nil {
 			return err
 		}
@@ -110,9 +110,9 @@ func (s *Store) CreateMonitor(ctx context.Context, m monitor.Monitor) (monitor.M
 // and its status page presentation is left alone (see SaveStatusPageLayout).
 func (s *Store) UpdateMonitor(ctx context.Context, m monitor.Monitor) (monitor.Monitor, error) {
 	err := s.inTx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `UPDATE monitors SET name = ?, paused = ?, source = ?, public = ?, updated_at = ?
+		res, err := tx.ExecContext(ctx, `UPDATE monitors SET name = ?, paused = ?, source = ?, source_ref = ?, public = ?, updated_at = ?
 			WHERE id = ? AND kind = ?`,
-			m.Name, m.Paused, m.Source, m.Public, time.Now().UTC().UnixMilli(), m.ID, m.Kind)
+			m.Name, m.Paused, m.Source, m.SourceRef, m.Public, time.Now().UTC().UnixMilli(), m.ID, m.Kind)
 		if err != nil {
 			return err
 		}

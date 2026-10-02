@@ -11,6 +11,7 @@ import (
 
 	"github.com/uptimy/agent/internal/config"
 	"github.com/uptimy/agent/internal/connect"
+	"github.com/uptimy/agent/internal/discovery"
 	"github.com/uptimy/agent/internal/events"
 	"github.com/uptimy/agent/internal/monitor"
 	"github.com/uptimy/agent/internal/notify"
@@ -29,6 +30,8 @@ type Server struct {
 	Log           *slog.Logger
 	Watchdog      *connect.Watchdog
 	KubeAvailable bool
+	// Discovery is nil unless Kubernetes discovery runs.
+	Discovery *discovery.Discoverer
 
 	limiter *loginLimiter
 	connect connectFlows
@@ -61,6 +64,9 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	auth("POST /api/auth/tokens", s.createAPIToken)
 	auth("DELETE /api/auth/tokens/{id}", s.deleteAPIToken)
 	auth("GET /api/events", s.stream)
+
+	auth("GET /api/kubernetes/discovery", s.kubernetesStatus)
+	auth("GET /api/kubernetes/resources", s.kubernetesResources)
 
 	auth("GET /api/check-types", s.checkTypes)
 	auth("GET /api/notifier-types", s.notifierTypes)
@@ -210,6 +216,7 @@ func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"version":             s.Version,
 		"kubernetes":          s.KubeAvailable,
+		"discovery":           s.Discovery != nil,
 		"uptimy_heartbeat":    s.Watchdog.Status().Enabled,
 		"status_page_enabled": sp.Enabled,
 		"status_page_title":   sp.Title,

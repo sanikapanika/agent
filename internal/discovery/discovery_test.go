@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -18,22 +19,22 @@ import (
 )
 
 const services = `{"items":[
- {"metadata":{"name":"checkout","namespace":"shop"},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"checkout","namespace":"shop"},
   "spec":{"ports":[{"name":"http","port":8080}]}},
- {"metadata":{"name":"postgres","namespace":"shop","annotations":{"upti.my/name":"Shop database"}},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"postgres","namespace":"shop","annotations":{"upti.my/name":"Shop database"}},
   "spec":{"ports":[{"name":"pg","port":5432}]}},
- {"metadata":{"name":"api","namespace":"shop","annotations":{
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"api","namespace":"shop","annotations":{
    "upti.my/port":"admin","upti.my/path":"healthz","upti.my/interval":"30s","upti.my/keyword":"ok"}},
   "spec":{"ports":[{"name":"grpc","port":9090},{"name":"admin","port":9091}]}},
- {"metadata":{"name":"broken","namespace":"shop","annotations":{"upti.my/interval":"often"}},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"broken","namespace":"shop","annotations":{"upti.my/interval":"often"}},
   "spec":{"ports":[{"port":80}]}},
- {"metadata":{"name":"web","namespace":"shop"},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"web","namespace":"shop"},
   "spec":{"selector":{"app":"web"},"ports":[{"name":"main","port":80,"targetPort":"http"}]}},
- {"metadata":{"name":"grpcish","namespace":"shop"},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"grpcish","namespace":"shop"},
   "spec":{"selector":{"app":"grpcish"},"ports":[{"name":"api","port":9000,"targetPort":9000}]}},
- {"metadata":{"name":"admin","namespace":"shop"},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"admin","namespace":"shop"},
   "spec":{"selector":{"app":"admin"},"ports":[{"name":"http","port":80,"targetPort":8080}]}},
- {"metadata":{"name":"queue","namespace":"shop","annotations":{"upti.my/type":"kubernetes"}},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"queue","namespace":"shop","annotations":{"upti.my/type":"kubernetes"}},
   "spec":{"selector":{"app":"queue"},"ports":[{"port":5672}]}}
 ]}`
 
@@ -48,14 +49,17 @@ const (
 )
 
 const ingresses = `{"items":[
- {"metadata":{"name":"shop","namespace":"shop"},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"shop","namespace":"shop"},
   "spec":{"rules":[{"host":"shop.example.com"},{"host":"admin.example.com"},{"host":"*.example.com"},{}],
           "tls":[{"hosts":["shop.example.com"]}]}}
 ]}`
 
 const deployments = `{"items":[
- {"metadata":{"name":"checkout","namespace":"shop"}},
- {"metadata":{"name":"worker","namespace":"shop","annotations":{"upti.my/name":"shop/checkout"}}}
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"checkout","namespace":"shop"}},
+ {"metadata":{"labels":{"upti.my/monitor":"true"},"name":"worker","namespace":"shop","annotations":{"upti.my/name":"Checkout worker"}}},
+ {"metadata":{"labels":{"upti.my/monitor":"false"},"name":"opted-out","namespace":"shop"}},
+ {"metadata":{"labels":{"upti.my/monitor":"yes please"},"name":"typo","namespace":"shop"}},
+ {"metadata":{"labels":{"upti.my/monitor":"Yes"},"name":"api","namespace":"shop"}}
 ]}`
 
 // fakeAPI serves list responses by path. Paths not in the map are 404.
@@ -71,7 +75,7 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := r.URL.Path
 	if strings.HasSuffix(key, "/pods") {
 		key += "?" + r.URL.Query().Get("labelSelector")
-	} else if !strings.HasSuffix(key, "/jobs") && r.URL.Query().Get("labelSelector") != "upti.my/monitor=true" {
+	} else if !strings.HasSuffix(key, "/jobs") && r.URL.Query().Get("labelSelector") != "upti.my/monitor" {
 		http.Error(w, "missing label selector", http.StatusBadRequest)
 		return
 	}
@@ -136,6 +140,8 @@ func TestDiscover(t *testing.T) {
 		"shop.example.com":           {monitor.TypeHTTP, "https://shop.example.com/", 60},
 		"admin.example.com":          {monitor.TypeHTTP, "http://admin.example.com/", 60},
 		"shop/checkout (deployment)": {monitor.TypeKubernetes, "shop/deployment/checkout", 60},
+		"Checkout worker":            {monitor.TypeKubernetes, "shop/deployment/worker", 60},
+		"shop/api (deployment)":      {monitor.TypeKubernetes, "shop/deployment/api", 60}, // labeled "Yes"
 		// The pods' readinessProbe path and scheme, on the Service's port.
 		"shop/web":     {monitor.TypeHTTP, "http://web.shop.svc:80/healthz", 60},
 		"shop/grpcish": {monitor.TypeHTTP, "https://grpcish.shop.svc:9000/ready", 60},
@@ -157,9 +163,31 @@ func TestDiscover(t *testing.T) {
 		t.Error("keyword annotation ignored")
 	}
 	// The broken interval is skipped, the wildcard and catch-all hosts too,
-	// and the worker's name clashes with the checkout Service.
+	// and so are a deployment labeled "false" and one with a typo.
 	if len(got) != len(want) {
 		t.Errorf("got %d monitors, want %d: %v", len(got), len(want), got)
+	}
+	refs := map[string]string{}
+	for _, x := range ds {
+		refs[x.Name] = x.SourceRef
+	}
+	for name, ref := range map[string]string{
+		"shop/checkout":    "service/shop/checkout",
+		"shop.example.com": "ingress/shop/shop#shop.example.com",
+		"Checkout worker":  "deployment/shop/worker",
+	} {
+		if refs[name] != ref {
+			t.Errorf("%s: ref %q, want %q", name, refs[name], ref)
+		}
+	}
+	st := d.Status()
+	if st.LastScan.IsZero() || st.Error != "" || st.Monitors != len(want) || st.Scope != "cluster" {
+		t.Errorf("status %+v", st)
+	}
+	if !slices.ContainsFunc(st.Warnings, func(w string) bool {
+		return strings.Contains(w, `deployment shop/typo: upti.my/monitor is "yes please"`)
+	}) {
+		t.Errorf("the label typo isn't reported: %v", st.Warnings)
 	}
 	for _, d := range ds {
 		if d.Source != monitor.SourceKubernetes || d.Public {
@@ -175,7 +203,7 @@ func TestDiscoverNamespaced(t *testing.T) {
 	for _, p := range []string{"/api/v1/services", "/apis/networking.k8s.io/v1/ingresses", "/apis/apps/v1/deployments", "/apis/apps/v1/statefulsets", "/apis/apps/v1/daemonsets"} {
 		f.status[p] = http.StatusForbidden
 	}
-	f.set("/api/v1/namespaces/monitoring/services", `{"items":[{"metadata":{"name":"agent","namespace":"monitoring"},"spec":{"ports":[{"name":"http","port":80}]}}]}`)
+	f.set("/api/v1/namespaces/monitoring/services", `{"items":[{"metadata":{"labels":{"upti.my/monitor":"true"},"name":"agent","namespace":"monitoring"},"spec":{"ports":[{"name":"http","port":80}]}}]}`)
 	ds, err := d.Discover(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -214,7 +242,7 @@ func TestSyncKeepsPause(t *testing.T) {
 		}
 		return ch
 	}
-	if ch := rescan(); ch.Created != 10 {
+	if ch := rescan(); ch.Created != 12 {
 		t.Fatalf("created %d", ch.Created)
 	}
 	all, _ := st.ListMonitors(ctx)
@@ -228,6 +256,16 @@ func TestSyncKeepsPause(t *testing.T) {
 	}
 	if m, _ := st.GetMonitor(ctx, paused.ID); !m.Paused {
 		t.Fatal("pausing in the UI didn't stick")
+	}
+
+	// Renaming with upti.my/name keeps the monitor, and its history.
+	before := got0(t, st, "Shop database")
+	f.set("/api/v1/services", strings.Replace(services, `"upti.my/name":"Shop database"`, `"upti.my/name":"Orders database"`, 1))
+	if ch := rescan(); ch.Created != 0 || ch.Updated != 1 || len(ch.Deleted) != 0 {
+		t.Fatalf("rename: %+v", ch)
+	}
+	if after := got0(t, st, "Orders database"); after.ID != before.ID {
+		t.Fatalf("a rename made a new monitor: %d → %d", before.ID, after.ID)
 	}
 
 	// Unlabeling the Ingress deletes its two monitors.
@@ -278,7 +316,7 @@ func TestInvalidAnnotationKeepsMonitor(t *testing.T) {
 	if _, err := d.Discover(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	f.set("/apis/apps/v1/deployments", `{"items":[{"metadata":{"name":"checkout","namespace":"shop","annotations":{"upti.my/interval":"soon"}}}]}`)
+	f.set("/apis/apps/v1/deployments", `{"items":[{"metadata":{"labels":{"upti.my/monitor":"true"},"name":"checkout","namespace":"shop","annotations":{"upti.my/interval":"soon"}}}]}`)
 	ds, err := d.Discover(context.Background())
 	if err != nil {
 		t.Fatal(err)
