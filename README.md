@@ -32,7 +32,7 @@ Because it runs next to your services, it can check things that external monitor
 - **Status page:** public, at `/status`. Admins set a logo (with an optional dark-mode version), accent color and website link, create sections and drag monitors into order with public names, with a live preview, much like the Uptimy app. New monitors stay off the page until you add them. It shows names with uptime (healthchecks) or on-time runs (heartbeats) only, never internal hostnames
 - **GitOps-friendly:** define monitors in YAML (a file, a ConfigMap or an env var), or click them together in the UI. Script everything else with [API tokens](#api)
 - **Switching from Uptime Kuma:** import its monitors and notifications in a few clicks; see [below](#switching-from-uptime-kuma)
-- **Light:** a single ~12 MB static binary (14 MB image) with an embedded SQLite database (pure Go, no CGO) and a distroless image. It uses about 25 MB of RAM with a handful of monitors
+- **Light:** one static Go binary with an embedded SQLite database (pure Go, no CGO) in a distroless image: a 9 MB download. It uses 8 MiB of memory idle and 24 MiB with 350 monitors, a fraction of Uptime Kuma's 130–160 MiB ([benchmark](bench/uptime-kuma/README.md))
 
 ## Quick start
 
