@@ -14,6 +14,10 @@
   One small Go binary. Web UI included. Apache-2.0.
 </p>
 
+<p align="center">
+  <a href="https://artifacthub.io/packages/search?repo=uptimy-agent"><img src="https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/uptimy-agent" alt="Artifact Hub"></a>
+</p>
+
 ---
 
 Uptimy Agent watches your websites, APIs, databases, DNS, TLS certificates, cron jobs and Kubernetes workloads, alerts you by email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty or webhooks, and publishes a public status page.
