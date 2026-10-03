@@ -413,6 +413,8 @@ export interface PublicMaintenance {
   description: string;
   starts_at: string;
   ends_at: string;
+  created_at: string;
+  state: "scheduled" | "active" | "ended";
   active: boolean;
   monitors: string[]; // public names; empty means all
 }
@@ -428,6 +430,8 @@ export interface PublicStatus {
   logos: StatusPageLogos;
   accent_color: string; // "" = Uptimy green
   website_url: string;
+  /** Show the Uptimy card in the footer (hosted pages hide it for white-label). */
+  uptimy_card: boolean;
   overall: "operational" | "degraded" | "outage" | "maintenance";
   maintenance: PublicMaintenance[];
   sections: { name: string; monitors: PublicMonitor[] }[];
@@ -463,6 +467,7 @@ export interface StatusPageSettings {
   website_url: string;
   /** A hostname that serves only the status page, e.g. status.example.com. */
   domain: string;
+  hide_uptimy_card: boolean;
   sections: StatusSection[];
 }
 

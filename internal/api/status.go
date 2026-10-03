@@ -38,15 +38,18 @@ type publicMonitor struct {
 // publicMaintenance announces planned work. Monitors are the public names of
 // those it covers; empty means all of them.
 type publicMaintenance struct {
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	StartsAt    time.Time `json:"starts_at"`
-	EndsAt      time.Time `json:"ends_at"`
-	Active      bool      `json:"active"`
-	Monitors    []string  `json:"monitors"`
+	Title       string            `json:"title"`
+	Description string            `json:"description"`
+	StartsAt    time.Time         `json:"starts_at"`
+	EndsAt      time.Time         `json:"ends_at"`
+	CreatedAt   time.Time         `json:"created_at"`
+	State       maintenance.State `json:"state"`
+	Active      bool              `json:"active"`
+	Monitors    []string          `json:"monitors"`
 }
 
-// maintenanceNotice is how far ahead the status page announces maintenance.
+// maintenanceNotice is how far ahead the status page announces maintenance,
+// and how long it keeps showing it once completed.
 const maintenanceNotice = 7 * 24 * time.Hour
 
 type publicSection struct {
@@ -180,7 +183,11 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	published := publicIncidents(posted, names)
-	notices := s.publicMaintenance(names)
+	notices, err := s.publicMaintenance(r.Context(), names)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 
 	w.Header().Set("Cache-Control", "public, max-age=30")
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -189,6 +196,7 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 		"logos":        logos,
 		"accent_color": settings.AccentColor,
 		"website_url":  settings.WebsiteURL,
+		"uptimy_card":  !settings.HideUptimyCard,
 		"overall":      overallStatus(anyDown, published, notices),
 		"maintenance":  notices,
 		"sections":     sections,
@@ -247,7 +255,11 @@ func (s *Server) pageOverall(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return overallStatus(anyDown, publicIncidents(posted, names), s.publicMaintenance(names)), nil
+	notices, err := s.publicMaintenance(ctx, names)
+	if err != nil {
+		return "", err
+	}
+	return overallStatus(anyDown, publicIncidents(posted, names), notices), nil
 }
 
 // publicIncidents is what the page shows of posted incidents: open and
@@ -354,20 +366,24 @@ func (s *Server) publicMaintenanceCovers(monitorID int64) bool {
 	return false
 }
 
-// publicMaintenance lists public windows that are active or start within
-// maintenanceNotice and cover a monitor on the page. names maps the page's
+// publicMaintenance lists public windows that start within maintenanceNotice,
+// are active, or ended within it, and cover a monitor on the page. names maps the page's
 // monitors to their public names.
-func (s *Server) publicMaintenance(names map[int64]string) []publicMaintenance {
+func (s *Server) publicMaintenance(ctx context.Context, names map[int64]string) ([]publicMaintenance, error) {
 	now := time.Now()
+	ws, err := s.Store.ListMaintenance(ctx, now.Add(-maintenanceNotice))
+	if err != nil {
+		return nil, err
+	}
 	out := []publicMaintenance{}
-	for _, w := range s.Scheduler.Maintenance() {
+	for _, w := range ws {
 		state := w.StateAt(now)
-		if !w.Public || state == maintenance.Ended || w.StartsAt.Sub(now) > maintenanceNotice {
+		if !w.Public || w.StartsAt.Sub(now) > maintenanceNotice || now.Sub(w.EndsAt) > maintenanceNotice {
 			continue
 		}
 		notice := publicMaintenance{
-			Title: w.Title, Description: w.Description, StartsAt: w.StartsAt, EndsAt: w.EndsAt,
-			Active: state == maintenance.Active, Monitors: []string{},
+			Title: w.Title, Description: w.Description, StartsAt: w.StartsAt, EndsAt: w.EndsAt, CreatedAt: w.CreatedAt,
+			State: state, Active: state == maintenance.Active, Monitors: []string{},
 		}
 		if !w.AllMonitors {
 			for _, id := range w.MonitorIDs {
@@ -381,5 +397,5 @@ func (s *Server) publicMaintenance(names map[int64]string) []publicMaintenance {
 		}
 		out = append(out, notice)
 	}
-	return out
+	return out, nil
 }

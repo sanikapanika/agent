@@ -147,7 +147,9 @@ func TestMaintenanceAPI(t *testing.T) {
 	if code, _ := c.do("POST", "/api/maintenance/"+id+"/end", nil); code != 409 {
 		t.Fatalf("end twice: %d", code)
 	}
-	if _, text := pingURL(t, c, "/api/status", ""); strings.Contains(text, `"overall":"maintenance"`) {
-		t.Fatalf("still in maintenance: %s", text)
+	// Once ended, it's still shown for a while, as completed.
+	if _, text := pingURL(t, c, "/api/status", ""); strings.Contains(text, `"overall":"maintenance"`) ||
+		!strings.Contains(text, `"state":"ended"`) || !strings.Contains(text, `"Database upgrade"`) {
+		t.Fatalf("after ending: %s", text)
 	}
 }

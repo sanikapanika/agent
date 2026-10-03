@@ -3,11 +3,13 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, AlertTriangle, CheckCircle, Clock, ExternalLink, XCircle, Wrench } from "lucide-react";
-import { api, type PublicMonitor, type PublicStatus, type Status, type PublicMaintenance } from "@/lib/api";
+import { api, type PublicMonitor, type PublicStatus, type Status } from "@/lib/api";
 import { cn, formatDateTime, timeAgo } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DailyBars } from "@/components/status";
-import { PoweredBy } from "@/components/brand";
+import { PoweredBy, UptimyLogo } from "@/components/brand";
+import { buttonVariants } from "@/components/ui/button";
+import { MaintenanceCard } from "@/components/status-page/maintenance";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { ErrorNote } from "@/components/Layout";
@@ -137,9 +139,6 @@ export function StatusPage() {
                 <NoticeCard notice={n} />
               </div>
             ))}
-            {s.maintenance.map((n) => (
-              <MaintenanceNotice key={`${n.title}-${n.starts_at}`} n={n} />
-            ))}
 
             {s.sections.length === 0 ? (
               <Card className="mt-8">
@@ -206,6 +205,25 @@ export function StatusPage() {
               </Card>
             )}
 
+            {s.maintenance.length > 0 && (
+              <Card className="mt-6 overflow-hidden border border-degraded/20">
+                <CardHeader className="border-b border-degraded/10 bg-degraded/5">
+                  <CardTitle className="flex items-center text-base font-semibold text-orange-600 dark:text-orange-400">
+                    <span className="mr-3 h-5 w-1 rounded-full bg-degraded" />
+                    <Wrench className="mr-2 size-4" />
+                    Scheduled Maintenance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6 p-3 sm:p-6">
+                  {[...s.maintenance]
+                    .sort((a, b) => maintenanceRank[a.state] - maintenanceRank[b.state])
+                    .map((m) => (
+                      <MaintenanceCard key={`${m.title}-${m.starts_at}`} m={m} />
+                    ))}
+                </CardContent>
+              </Card>
+            )}
+
             {s.events.length > 0 && (
               <Card className="mt-8">
                 <SectionHeader title="Recent events" />
@@ -229,16 +247,67 @@ export function StatusPage() {
               </Card>
             )}
 
-            <footer className="mt-10 flex flex-col items-center gap-3 text-xs text-muted-foreground">
-              <div className="flex items-center gap-3">
-                <PoweredBy medium="status_page" />
-                <span className="text-border">·</span>
-                <ThemeToggle />
-              </div>
-              <span>Last updated {timeAgo(s.updated)}</span>
+            {/* As on hosted pages: the Uptimy card, or with it turned off a
+                "Powered by" line. */}
+            <footer className="mt-12 flex flex-col items-center gap-3 py-8 text-xs text-muted-foreground">
+              {s.uptimy_card ? (
+                <>
+                  <UptimyCard />
+                  <div className="mt-3">
+                    <ThemeToggle />
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <PoweredBy medium="status_page" />
+                  <span className="text-border">·</span>
+                  <ThemeToggle />
+                </div>
+              )}
+              <span className="flex items-center gap-1.5">
+                <span className="size-1.5 rounded-full bg-up" />
+                Updated {timeAgo(s.updated)}
+              </span>
             </footer>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** In progress first, then upcoming, then recently completed. */
+const maintenanceRank = { active: 0, scheduled: 1, ended: 2 } as const;
+
+const utm = (url: string) => `${url}?utm_source=uptimy-agent&utm_medium=footer_card&utm_campaign=status_page`;
+
+/** The hosted pages' footer card: what Uptimy is, and a way to try it. */
+function UptimyCard() {
+  return (
+    <div className="w-full rounded-lg border bg-card p-5">
+      <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+        <a href={utm("https://www.upti.my/")} target="_blank" rel="noopener" className="flex items-center gap-3">
+          <UptimyLogo className="h-8 sm:h-9" />
+          <span className="text-xs text-muted-foreground">Status Pages</span>
+        </a>
+        <div className="flex gap-2">
+          <a
+            href={utm("https://app.upti.my/")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonVariants({ size: "sm", className: "text-xs" })}
+          >
+            Create Status Page
+          </a>
+          <a
+            href={utm("https://www.upti.my/docs/status-pages")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonVariants({ size: "sm", variant: "outline", className: "text-xs" })}
+          >
+            Learn More
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -278,40 +347,6 @@ function Banner({ overall }: { overall: PublicStatus["overall"] }) {
 }
 
 const maintenanceAccent = { border: "border-l-sky-500", dot: "bg-sky-500", live: false };
-
-/** Planned work, in progress or coming up. */
-function MaintenanceNotice({ n }: { n: PublicMaintenance }) {
-  const range = `${formatWhen(n.starts_at)} – ${formatWhen(n.ends_at)}`;
-  return (
-    <Card className="mt-4 border-sky-500/40 bg-sky-500/5 p-4 sm:p-5">
-      <div className="flex gap-3">
-        <Wrench className="mt-0.5 size-5 shrink-0 text-sky-500" />
-        <div className="min-w-0">
-          <div className="text-xs font-medium tracking-wide text-sky-600 uppercase dark:text-sky-400">
-            {n.active ? "Maintenance in progress" : "Scheduled maintenance"}
-          </div>
-          <h3 className="mt-1 font-semibold">{n.title}</h3>
-          <p className="mt-0.5 text-sm text-muted-foreground">{range}</p>
-          {n.description && <p className="mt-2 text-sm whitespace-pre-line">{n.description}</p>}
-          <p className="mt-2 text-xs text-muted-foreground">
-            Affects: {n.monitors.length ? n.monitors.join(", ") : "all services"}
-          </p>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-/** "Thu, Oct 2, 03:00" in the viewer's time zone. */
-function formatWhen(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function MonitorCard({ m }: { m: PublicMonitor }) {
   const accent = m.in_maintenance ? maintenanceAccent : accents[m.status];
@@ -398,6 +433,10 @@ function MonitorCard({ m }: { m: PublicMonitor }) {
         </div>
         <div className="rounded-lg border bg-muted/30 p-2 sm:p-3">
           <DailyBars days={m.days} measure={measure} />
+        </div>
+        <div className="mt-2 flex justify-between px-1 text-[11px] text-muted-foreground">
+          <span>{m.days.length} days ago</span>
+          <span>Today</span>
         </div>
       </div>
     </div>

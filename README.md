@@ -222,7 +222,7 @@ For anything without its own channel, add a **More services (Shoutrrr)** channel
 
 ### Maintenance
 
-Schedule maintenance under **Maintenance** before deploys, upgrades or migrations: for all monitors or some, starting now or later. During the window the monitors keep being checked, but nobody is alerted. If one is still down when the window ends, its alert goes out then; if it recovered, nothing is sent. Public windows are announced on the status page up to a week ahead, and the affected monitors are marked as under maintenance rather than down.
+Schedule maintenance under **Maintenance** before deploys, upgrades or migrations: for all monitors or some, starting now or later. During the window the monitors keep being checked, but nobody is alerted. If one is still down when the window ends, its alert goes out then; if it recovered, nothing is sent. Public windows are announced on the status page up to a week ahead and stay listed as completed for a week after, and the affected monitors are marked as under maintenance rather than down.
 
 ### Incidents
 

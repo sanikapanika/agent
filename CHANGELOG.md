@@ -10,6 +10,7 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 - **Custom domain for the status page:** set one (e.g. `status.example.com`) under Status page and that address shows the status page at its root, and serves nothing else but heartbeat pings: no sign-in, API or `/metrics`, so the dashboard can stay on a private address. DNS and TLS stay with your Ingress, Railway or proxy. The address you're using for the dashboard can't be chosen.
 
 ### Changed
+- The status page looks like the hosted Uptimy pages: incidents in Active and Past Incidents sections with cards that expand into a timeline, maintenance in a Scheduled Maintenance section (in progress with a progress bar, upcoming, and completed in the last week), "30 days ago … Today" under the daily bars, and the Uptimy card in the footer. Admins can turn the card off under Status page → Branding; the "Powered by Uptimy" line then stays.
 - The public status API lists monitors going down and recovering under `events`; `incidents` now holds posted incidents and notices.
 - Two-factor setup: numbered steps, a framed QR code with the key behind "Can't scan it?", a code field that submits itself, and recovery codes you confirm you've saved before closing.
 
