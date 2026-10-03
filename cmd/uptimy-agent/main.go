@@ -42,6 +42,10 @@ func main() {
 		case "healthcheck":
 			// For Docker HEALTHCHECK: the distroless image has no curl.
 			os.Exit(healthcheck())
+		case "reset-2fa":
+			// For a user, the only admin included, who lost both their
+			// phone and their recovery codes.
+			os.Exit(resetTwoFactor(os.Args[2:]))
 		}
 	}
 	if err := run(log); err != nil {
@@ -215,5 +219,40 @@ func healthcheck() int {
 	if resp.StatusCode != http.StatusOK {
 		return 1
 	}
+	return 0
+}
+
+// resetTwoFactor turns two-factor sign-in off for a user, straight in the
+// database, for when no admin can sign in to do it:
+//
+//	uptimy-agent reset-2fa <username>
+//	kubectl -n monitoring exec deploy/uptimy-agent -- uptimy-agent reset-2fa admin
+func resetTwoFactor(args []string) int {
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "usage: uptimy-agent reset-2fa <username>")
+		return 2
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	st, err := store.Open(cfg.DatabasePath())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "open database:", err)
+		return 1
+	}
+	defer st.Close()
+	ctx := context.Background()
+	u, err := st.GetUserByUsername(ctx, args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "no user %q: %v\n", args[0], err)
+		return 1
+	}
+	if err := st.DisableTOTP(ctx, u.ID); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("two-factor sign-in is off for %s; they can sign in with their password\n", u.Username)
 	return 0
 }

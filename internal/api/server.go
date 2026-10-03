@@ -59,6 +59,11 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	auth("GET /api/info", s.info)
 	auth("GET /metrics", s.metrics)
 	auth("POST /api/auth/password", s.changePassword)
+	auth("GET /api/auth/2fa", s.twoFactorStatus)
+	auth("POST /api/auth/2fa/setup", s.setupTwoFactor)
+	auth("POST /api/auth/2fa/enable", s.enableTwoFactor)
+	auth("POST /api/auth/2fa/disable", s.disableTwoFactor)
+	auth("POST /api/auth/2fa/recovery-codes", s.newRecoveryCodesHandler)
 	auth("GET /api/auth/sessions", s.sessions)
 	auth("POST /api/auth/sessions/sign-out-others", s.signOutOthers)
 	auth("GET /api/auth/tokens", s.listAPITokens)
@@ -121,6 +126,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	admin("POST /api/users", s.createUser)
 	admin("PUT /api/users/{id}", s.updateUser)
 	admin("DELETE /api/users/{id}", s.deleteUser)
+	admin("POST /api/users/{id}/2fa/reset", s.resetTwoFactor)
 
 	// The plan includes the channels' secrets (webhook URLs, keys).
 	admin("POST /api/import/kuma", s.planKumaImport)

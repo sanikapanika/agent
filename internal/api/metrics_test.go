@@ -11,7 +11,7 @@ import (
 func TestMetrics(t *testing.T) {
 	c := newTestServer(t)
 	c.login("admin", adminPassword)
-	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) }))
+	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
 	defer site.Close()
 	// A quote in the name checks label escaping.
 	if code, _ := c.do("POST", "/api/healthchecks", map[string]any{"name": `Shop "API"`, "check": map[string]any{"type": "http", "target": site.URL, "interval_seconds": 10}}); code != 201 {
@@ -22,7 +22,7 @@ func TestMetrics(t *testing.T) {
 	}
 
 	get := func(cl *client) (int, string) {
-		req, _ := http.NewRequest("GET", c.base+"/metrics", nil)
+		req, _ := http.NewRequest(http.MethodGet, c.base+"/metrics", nil)
 		cl.authorize(req)
 		resp, err := cl.http.Do(req)
 		if err != nil {

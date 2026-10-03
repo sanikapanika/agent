@@ -350,6 +350,8 @@ export interface User {
   password_managed_by_env: boolean;
   created_at: string;
   last_login_at: string | null;
+  /** Signing in also takes a code from an authenticator app. */
+  two_factor: boolean;
 }
 
 export interface AuthState {
@@ -432,6 +434,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** The response body, for errors that carry more than a message. */
+    public body: Record<string, unknown> = {},
   ) {
     super(message);
   }
@@ -455,7 +459,7 @@ async function request<T>(method: string, path: string, body?: unknown, cache?: 
   }
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, data.error ?? res.statusText);
+  if (!res.ok) throw new ApiError(res.status, data.error ?? res.statusText, data);
   return data as T;
 }
 
@@ -479,7 +483,15 @@ async function upload<T>(path: string, file: File): Promise<T> {
 
 export const api = {
   authState: () => request<AuthState>("GET", "/api/auth/state"),
-  login: (username: string, password: string) => request<AuthState>("POST", "/api/auth/login", { username, password }),
+  login: (username: string, password: string, code?: string) =>
+    request<AuthState>("POST", "/api/auth/login", { username, password, code }),
+  twoFactor: () => request<{ enabled: boolean; recovery_codes_left: number }>("GET", "/api/auth/2fa"),
+  setupTwoFactor: () => request<{ secret: string; uri: string }>("POST", "/api/auth/2fa/setup", {}),
+  enableTwoFactor: (code: string) => request<{ recovery_codes: string[] }>("POST", "/api/auth/2fa/enable", { code }),
+  disableTwoFactor: (password: string) => request<void>("POST", "/api/auth/2fa/disable", { password }),
+  newRecoveryCodes: (password: string) =>
+    request<{ recovery_codes: string[] }>("POST", "/api/auth/2fa/recovery-codes", { password }),
+  resetTwoFactor: (userID: number) => request<void>("POST", `/api/users/${userID}/2fa/reset`, {}),
   logout: () => request("POST", "/api/auth/logout"),
   changePassword: (current: string, next: string) =>
     request<AuthState>("POST", "/api/auth/password", { current, new: next }),

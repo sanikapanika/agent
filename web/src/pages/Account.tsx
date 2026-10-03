@@ -11,6 +11,7 @@ import { ErrorNote, PageHeader } from "@/components/Layout";
 import { useMe, useSignOut } from "@/components/AuthGate";
 import { Avatar } from "@/components/UserMenu";
 import { APITokensCard } from "@/components/APITokens";
+import { TwoFactorCard } from "@/components/TwoFactor";
 
 /** The signed-in user's own account: who they are, password, devices, API tokens. */
 export function Account() {
@@ -40,6 +41,7 @@ export function Account() {
         </Card>
 
         <PasswordCard />
+        <TwoFactorCard />
         <DevicesCard />
         <APITokensCard />
 

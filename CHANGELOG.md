@@ -5,6 +5,7 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 ## [Unreleased]
 
 ### Added
+- Two-factor sign-in with an authenticator app (TOTP): set up under Account with a QR code, 10 one-time recovery codes, other devices signed out when it's turned on, and a used code can't be used again. Admins can turn it off for another user; `uptimy-agent reset-2fa <username>` does it from the server when nobody can sign in. API tokens aren't affected.
 - Prometheus metrics at `/metrics`, with an API token: each monitor's status, check results and durations, heartbeat runs by outcome and next due time, maintenance, Kubernetes discovery, and the agent's version, goroutines and memory. Targets aren't exported. The chart can create a ServiceMonitor (`metrics.serviceMonitor`).
 
 ## [0.1.4] - 2026-10-02

@@ -161,6 +161,13 @@ The agent starts with one admin account (see `ADMIN_USERNAME` / `ADMIN_PASSWORD`
 
 New users get a temporary password to pass on and choose their own at first sign-in. Admins can reset a password or change a role at any time; the agent won't let you delete or demote yourself or remove the last admin.
 
+**Two-factor sign-in:** anyone can turn it on under **Account → Two-factor sign-in**: scan the QR code with an authenticator app (1Password, Google Authenticator, Authy, ...), confirm a code, and save the 10 recovery codes, each good for one sign-in without the phone. Turning it on signs out your other devices. API tokens aren't affected. An admin can turn it off for another user under **Users**; if nobody who can is able to sign in, run the agent's binary against its data:
+
+```bash
+kubectl -n monitoring exec deploy/uptimy-agent -- uptimy-agent reset-2fa admin
+docker exec uptimy-agent uptimy-agent reset-2fa admin
+```
+
 ### Database monitors
 
 Postgres, MySQL and Redis monitors open a fresh connection on every check, log in, run a query (`SELECT 1` by default; `PING` for Redis) and disconnect. They catch what a TCP check can't: rejected logins, a full connection limit, a server that accepts connections but can't answer.

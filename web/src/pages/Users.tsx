@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Navigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, KeyRound, Plus, RefreshCw, Trash2, Users as UsersIcon } from "lucide-react";
+import { Check, Copy, KeyRound, Plus, RefreshCw, ShieldOff, Trash2, Users as UsersIcon } from "lucide-react";
 import { api, type Role, type User } from "@/lib/api";
 import { timeAgo } from "@/lib/utils";
 import { confirm } from "@/components/ui/confirm";
@@ -212,6 +212,13 @@ function UserRow({ u, isMe, onReset }: { u: User; isMe: boolean; onReset: (c: Cr
       onReset({ username: u.username, password, reason: "reset" });
     },
   });
+  const resetTwoFactor = useMutation({
+    mutationFn: () => api.resetTwoFactor(u.id),
+    onSuccess: () => {
+      refresh();
+      toast.success("Two-factor sign-in turned off", u.username);
+    },
+  });
   const remove = useMutation({
     mutationFn: () => api.deleteUser(u.id),
     onSuccess: () => {
@@ -229,6 +236,7 @@ function UserRow({ u, isMe, onReset }: { u: User; isMe: boolean; onReset: (c: Cr
           {isMe && <Badge>You</Badge>}
           {u.password_managed_by_env && <Badge title="Defined by ADMIN_USERNAME / ADMIN_PASSWORD">Env</Badge>}
           {u.must_change_password && <Badge className="border-paused/40 text-paused">Hasn't signed in yet</Badge>}
+          {u.two_factor && <Badge title="Signs in with a code from an authenticator app">Two-factor</Badge>}
         </div>
         <div className="mt-0.5 text-xs text-muted-foreground">
           {u.last_login_at ? `Last signed in ${timeAgo(u.last_login_at)}` : "Never signed in"}
@@ -278,6 +286,33 @@ function UserRow({ u, isMe, onReset }: { u: User; isMe: boolean; onReset: (c: Cr
             >
               <KeyRound />
             </Button>
+            {u.two_factor && (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Turn off two-factor sign-in for ${u.username}`}
+                title="Turn off two-factor sign-in"
+                disabled={resetTwoFactor.isPending}
+                onClick={() =>
+                  confirm({
+                    title: "Turn off two-factor sign-in",
+                    subtitle: "For a user who lost their phone and recovery codes",
+                    tone: "default",
+                    icon: ShieldOff,
+                    message: (
+                      <>
+                        <strong className="text-foreground">{u.username}</strong> signs in with their password alone
+                        until they set it up again from their account page.
+                      </>
+                    ),
+                    confirmLabel: "Turn off",
+                    action: () => resetTwoFactor.mutateAsync(),
+                  })
+                }
+              >
+                <ShieldOff />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

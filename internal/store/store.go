@@ -197,6 +197,18 @@ var migrations = []string{
 	// 3: what a monitor from outside the UI was made from (a Kubernetes
 	// object), so renaming it keeps its history.
 	`ALTER TABLE monitors ADD COLUMN source_ref TEXT NOT NULL DEFAULT '';`,
+
+	// 4: two-factor sign-in. totp_secret is set while setting up (enabled 0)
+	// and while on; totp_last_step stops a code being used twice. Recovery
+	// codes are kept as SHA-256 hashes and deleted when used.
+	`ALTER TABLE users ADD COLUMN totp_secret TEXT NOT NULL DEFAULT '';
+	ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE users ADD COLUMN totp_last_step INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE recovery_codes (
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		code_hash TEXT NOT NULL,
+		PRIMARY KEY (user_id, code_hash)
+	);`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {

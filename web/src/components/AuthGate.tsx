@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type AuthState, type User } from "@/lib/api";
+import { ApiError, api, type AuthState, type User } from "@/lib/api";
 import { useLiveUpdates } from "@/lib/live";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,16 +86,34 @@ function LoginForm() {
   const setAuth = useSetAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const login = useMutation({ mutationFn: () => api.login(username, password), onSuccess: setAuth });
+  const [code, setCode] = useState("");
+  // Accounts with two-factor sign-in answer a correct password with a
+  // request for the code, so the form moves to a second step.
+  const [needsCode, setNeedsCode] = useState(false);
+  const login = useMutation({
+    mutationFn: () => api.login(username, password, needsCode ? code : undefined),
+    onSuccess: setAuth,
+    onError: (e) => {
+      if (e instanceof ApiError && e.body.two_factor_required) setNeedsCode(true);
+    },
+  });
+  // Asking for the code isn't an error worth showing; a wrong code is.
+  const error = needsCode && !code ? null : login.error;
 
   return (
     <Centered>
       <Card>
         <CardHeader>
-          <CardTitle>Sign in</CardTitle>
+          <CardTitle>{needsCode ? "Two-factor sign-in" : "Sign in"}</CardTitle>
           <CardDescription>
-            First time? Sign in as <b>admin</b> with the password from <code>ADMIN_PASSWORD</code>, or the one printed
-            in the agent's startup log.
+            {needsCode ? (
+              <>Enter the 6-digit code from your authenticator app, or one of your recovery codes.</>
+            ) : (
+              <>
+                First time? Sign in as <b>admin</b> with the password from <code>ADMIN_PASSWORD</code>, or the one
+                printed in the agent's startup log.
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -106,32 +124,64 @@ function LoginForm() {
               login.mutate();
             }}
           >
-            <Field label="Username" htmlFor="username">
-              <Input
-                id="username"
-                autoComplete="username"
-                autoCapitalize="none"
-                spellCheck={false}
-                required
-                autoFocus
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            </Field>
-            <Field label="Password" htmlFor="password">
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </Field>
-            <ErrorNote error={login.error} />
+            {needsCode ? (
+              <Field label="Code" htmlFor="code">
+                <Input
+                  id="code"
+                  autoComplete="one-time-code"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  required
+                  autoFocus
+                  placeholder="123456"
+                  className="font-mono tracking-widest"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+              </Field>
+            ) : (
+              <>
+                <Field label="Username" htmlFor="username">
+                  <Input
+                    id="username"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    required
+                    autoFocus
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </Field>
+                <Field label="Password" htmlFor="password">
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </Field>
+              </>
+            )}
+            <ErrorNote error={error} />
             <Button type="submit" disabled={login.isPending}>
-              Sign in
+              {needsCode ? "Verify" : "Sign in"}
             </Button>
+            {needsCode && (
+              <button
+                type="button"
+                className="text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setNeedsCode(false);
+                  setCode("");
+                  login.reset();
+                }}
+              >
+                Back
+              </button>
+            )}
           </form>
         </CardContent>
       </Card>

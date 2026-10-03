@@ -216,6 +216,9 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		// Code is the second factor, for accounts that have it on: an
+		// authenticator code or a recovery code.
+		Code string `json:"code"`
 	}
 	if !decode(w, r, &req) {
 		return
@@ -233,6 +236,22 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		s.limiter.fail(ip)
 		writeError(w, http.StatusUnauthorized, "wrong username or password")
 		return
+	}
+	if u.TwoFactor {
+		if strings.TrimSpace(req.Code) == "" {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "enter the code from your authenticator app", "two_factor_required": true})
+			return
+		}
+		ok, err := s.checkSecondFactor(r.Context(), u, req.Code)
+		if err != nil {
+			s.internalError(w, r, err)
+			return
+		}
+		if !ok {
+			s.limiter.fail(ip)
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "that code didn't work; use the newest one, or a recovery code", "two_factor_required": true})
+			return
+		}
 	}
 	if err := s.Store.TouchLogin(r.Context(), u.ID); err != nil {
 		s.internalError(w, r, err)
