@@ -29,6 +29,10 @@ type Settings struct {
 	AccentColor string `json:"accent_color"`
 	// WebsiteURL adds a "Visit website" link to the header.
 	WebsiteURL string `json:"website_url"`
+	// Domain is a hostname, e.g. status.example.com, that serves only the
+	// status page: at "/", with no sign-in, API or metrics. Pointing it at the
+	// agent (DNS, TLS, an Ingress) is up to whoever runs it. Empty = none.
+	Domain string `json:"domain"`
 	// Sections group monitors, in display order. A monitor on the page with
 	// no (known) section goes in the first; with no sections, nothing shows.
 	Sections []Section `json:"sections"`
@@ -54,6 +58,7 @@ func Defaults() Settings {
 var (
 	hexColor  = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 	sectionID = regexp.MustCompile(`^[a-z0-9-]{1,40}$`)
+	hostname  = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 )
 
 // Validate cleans up and checks the settings.
@@ -62,6 +67,7 @@ func (p *Settings) Validate() error {
 	p.Description = strings.TrimSpace(p.Description)
 	p.AccentColor = strings.ToLower(strings.TrimSpace(p.AccentColor))
 	p.WebsiteURL = strings.TrimSpace(p.WebsiteURL)
+	p.Domain = NormalizeHost(p.Domain)
 	switch {
 	case p.Title == "":
 		return errors.New("the status page needs a title")
@@ -69,6 +75,8 @@ func (p *Settings) Validate() error {
 		return errors.New("keep the title under 100 characters and the description under 500")
 	case p.AccentColor != "" && !hexColor.MatchString(p.AccentColor):
 		return errors.New("the accent color must look like #33a36b")
+	case p.Domain != "" && (len(p.Domain) > 253 || !hostname.MatchString(p.Domain)):
+		return errors.New("the domain must be a hostname like status.example.com, without https:// or a path")
 	case len(p.Sections) > 20:
 		return errors.New("use at most 20 sections")
 	}
@@ -91,6 +99,23 @@ func (p *Settings) Validate() error {
 		seen[sec.ID] = true
 	}
 	return nil
+}
+
+// NormalizeHost turns a pasted address or a request's Host into a bare
+// lowercase hostname: "https://Status.Example.com:443/" is
+// "status.example.com".
+func NormalizeHost(h string) string {
+	h = strings.ToLower(strings.TrimSpace(h))
+	if i := strings.Index(h, "://"); i >= 0 {
+		h = h[i+3:]
+	}
+	if i := strings.IndexAny(h, "/?#"); i >= 0 {
+		h = h[:i]
+	}
+	if i := strings.LastIndexByte(h, ':'); i >= 0 && !strings.Contains(h[i:], "]") {
+		h = h[:i]
+	}
+	return strings.TrimSuffix(h, ".")
 }
 
 // HasSection reports whether id is one of the page's sections.

@@ -411,6 +411,8 @@ export interface StatusPageSettings {
   show_events: boolean;
   accent_color: string;
   website_url: string;
+  /** A hostname that serves only the status page, e.g. status.example.com. */
+  domain: string;
   sections: StatusSection[];
 }
 

@@ -2,12 +2,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/uptimy/agent/internal/config"
 	"github.com/uptimy/agent/internal/connect"
@@ -35,6 +37,8 @@ type Server struct {
 
 	limiter *loginLimiter
 	connect connectFlows
+	// statusDomain is the status page's own hostname, or "".
+	statusDomain atomic.Pointer[string]
 }
 
 // Handler returns the API routes plus ui for everything else.
@@ -143,7 +147,12 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	}))
 	mux.Handle("/", ui)
 
-	return securityHeaders(mux)
+	if sp, err := s.Store.StatusPage(context.Background()); err != nil {
+		s.Log.Error("reading the status page settings", "err", err)
+	} else {
+		s.setStatusDomain(sp.Domain)
+	}
+	return securityHeaders(s.statusDomainOnly(mux, ui))
 }
 
 func securityHeaders(next http.Handler) http.Handler {

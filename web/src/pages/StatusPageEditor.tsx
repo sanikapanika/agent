@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, FileText, RotateCcw, RotateCw } from "lucide-react";
+import { ExternalLink, FileText, Globe, RotateCcw, RotateCw } from "lucide-react";
 import { api, type StatusPageConfig, type StatusPageLogos } from "@/lib/api";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +38,7 @@ export function StatusPageEditor() {
         show_events: d.show_events,
         accent_color: d.accent_color,
         website_url: d.website_url,
+        domain: d.domain,
         sections: d.sections,
         monitors: d.monitors.map(({ id, public: pub, label, section }) => ({ id, public: pub, label, section })),
       });
@@ -59,15 +60,18 @@ export function StatusPageEditor() {
   };
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => edit((d) => ({ ...d, [key]: value }));
+  const domain = config.data?.domain;
+  const publicURL = domain ? `https://${domain}` : "/status";
+  const domainClash = !!draft && isDashboardHost(draft.domain);
 
   return (
     <>
       <PageHeader
         title="Status page"
         icon={FileText}
-        description="What visitors see at /status. Only names and uptime are shown, never hostnames or URLs."
+        description={`What visitors see at ${domain ?? "/status"}. Only names and uptime are shown, never hostnames or URLs.`}
         actions={
-          <a href="/status" target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline" })}>
+          <a href={publicURL} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline" })}>
             Open <ExternalLink />
           </a>
         }
@@ -132,6 +136,8 @@ export function StatusPageEditor() {
                   />
                 </CardContent>
               </Card>
+
+              <DomainCard value={draft.domain} onChange={(v) => set("domain", v)} />
 
               <Card>
                 <CardHeader>
@@ -205,7 +211,7 @@ export function StatusPageEditor() {
                   <Button variant="ghost" disabled={!dirty || save.isPending} onClick={() => setEdits(null)}>
                     Discard
                   </Button>
-                  <Button type="submit" disabled={!dirty || save.isPending}>
+                  <Button type="submit" disabled={!dirty || save.isPending || domainClash}>
                     {save.isPending ? "Saving…" : "Save changes"}
                   </Button>
                 </div>
@@ -244,5 +250,66 @@ export function StatusPageEditor() {
         </div>
       )}
     </>
+  );
+}
+
+// hostOf turns a pasted address into its hostname, as the server does.
+function hostOf(v: string) {
+  return v
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z]+:\/\//, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/:\d+$/, "")
+    .replace(/\.$/, "");
+}
+
+// isDashboardHost reports whether the domain is the address in use, which
+// would then show only the status page.
+function isDashboardHost(domain: string) {
+  const host = hostOf(domain);
+  return host !== "" && host === window.location.hostname;
+}
+
+function DomainCard({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isDashboard = isDashboardHost(value);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Custom domain</CardTitle>
+        <CardDescription>
+          Optional. A separate address, like status.example.com, that shows only the status page, at its root. Sign-in,
+          the dashboard and the API aren't served there, so they can stay private.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <Field
+          label="Domain"
+          htmlFor="sp-domain"
+          hint="Point its DNS at the agent and add TLS where you expose it: an Ingress, Railway's custom domains, or a proxy like Caddy. Heartbeat ping URLs work on it too."
+        >
+          <div className="relative">
+            <Globe className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="sp-domain"
+              className="pl-9 font-mono"
+              placeholder="status.example.com"
+              maxLength={253}
+              autoComplete="off"
+              spellCheck={false}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              aria-invalid={isDashboard || undefined}
+            />
+          </div>
+        </Field>
+        {isDashboard && (
+          <p className="rounded-md border border-down/30 bg-down/10 px-3 py-2 text-sm text-down">
+            That's the address you're using right now. Use a separate one for the status page, or this address would
+            show only the status page and you'd lose the dashboard here.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

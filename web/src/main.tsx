@@ -49,58 +49,75 @@ queryClient.getQueryCache().subscribe((event) => {
   }
 });
 
+// On the status page's own domain the server marks the page so only the
+// status page renders; nothing else is served there.
+const statusOnly = document.querySelector('meta[name="uptimy-view"]')?.getAttribute("content") === "status";
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ConfirmDialog />
       <Toaster />
       <BrowserRouter>
-        <Routes>
-          <Route
-            path="/status"
-            element={
-              <ErrorBoundary>
-                <StatusPage />
-              </ErrorBoundary>
-            }
-          />
-          <Route
-            element={
-              <AuthGate>
-                <Layout />
-              </AuthGate>
-            }
-          >
-            <Route index element={<Dashboard />} />
-            <Route path="healthchecks">
-              <Route index element={<HealthchecksPage />} />
-              <Route path="new" element={<HealthcheckForm />} />
-              <Route
-                path=":id"
-                element={
-                  <Suspense>
-                    <HealthcheckDetail />
-                  </Suspense>
-                }
-              />
-              <Route path=":id/edit" element={<HealthcheckForm />} />
+        {statusOnly ? (
+          <Routes>
+            <Route
+              path="*"
+              element={
+                <ErrorBoundary>
+                  <StatusPage />
+                </ErrorBoundary>
+              }
+            />
+          </Routes>
+        ) : (
+          <Routes>
+            <Route
+              path="/status"
+              element={
+                <ErrorBoundary>
+                  <StatusPage />
+                </ErrorBoundary>
+              }
+            />
+            <Route
+              element={
+                <AuthGate>
+                  <Layout />
+                </AuthGate>
+              }
+            >
+              <Route index element={<Dashboard />} />
+              <Route path="healthchecks">
+                <Route index element={<HealthchecksPage />} />
+                <Route path="new" element={<HealthcheckForm />} />
+                <Route
+                  path=":id"
+                  element={
+                    <Suspense>
+                      <HealthcheckDetail />
+                    </Suspense>
+                  }
+                />
+                <Route path=":id/edit" element={<HealthcheckForm />} />
+              </Route>
+              <Route path="heartbeats">
+                <Route index element={<HeartbeatsPage />} />
+                <Route path="new" element={<HeartbeatForm />} />
+                <Route path=":id" element={<HeartbeatDetail />} />
+                <Route path=":id/edit" element={<HeartbeatForm />} />
+              </Route>
+              <Route path="maintenance" element={<MaintenancePage />} />
+              <Route path="notifications" element={<Notifications />} />
+              <Route path="users" element={<Users />} />
+              <Route path="status-page" element={<StatusPageEditor />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="settings/kubernetes" element={<KubernetesPage />} />
+              <Route path="account" element={<Account />} />
+              <Route path="uptimy/connected" element={<UptimyConnected />} />
             </Route>
-            <Route path="heartbeats">
-              <Route index element={<HeartbeatsPage />} />
-              <Route path="new" element={<HeartbeatForm />} />
-              <Route path=":id" element={<HeartbeatDetail />} />
-              <Route path=":id/edit" element={<HeartbeatForm />} />
-            </Route>
-            <Route path="maintenance" element={<MaintenancePage />} />
-            <Route path="notifications" element={<Notifications />} />
-            <Route path="users" element={<Users />} />
-            <Route path="status-page" element={<StatusPageEditor />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="settings/kubernetes" element={<KubernetesPage />} />
-            <Route path="account" element={<Account />} />
-            <Route path="uptimy/connected" element={<UptimyConnected />} />
-          </Route>
-        </Routes>
+          </Routes>
+        )}
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

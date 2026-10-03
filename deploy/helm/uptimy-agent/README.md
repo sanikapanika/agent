@@ -5,7 +5,7 @@ Open-source, self-hosted uptime monitoring that runs inside your cluster. It che
 - **Healthchecks:** HTTP(S) with status and keyword checks, TCP, ping, DNS, TLS certificate expiry, Postgres, MySQL and Redis (a real login and query), and Kubernetes Deployments, StatefulSets and DaemonSets with fewer ready replicas than they should have.
 - **Heartbeats** for CronJobs, backups and workers: an interval or a cron schedule in any time zone, with missed and failed runs, exit codes and durations.
 - **Alerts** by email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty, webhooks, Uptimy and 30+ more services through a Shoutrrr URL.
-- **Status page** at `/status` with your logo, sections and public names. It never shows internal hostnames.
+- **Status page** at `/status`, or on its own domain with nothing else exposed there, with your logo, sections and public names. It never shows internal hostnames.
 - **Auto-discovery:** label a Service, Ingress, HTTPRoute, workload or CronJob with `upti.my/monitor: "true"` and it's monitored within 30 seconds.
 - **CronJobs without pings:** a labeled CronJob gets a heartbeat whose runs are read from its Jobs: start, finish, duration, and why it failed (exit code, OOMKilled).
 - **Monitors in Git:** or put them in `values.yaml` and they're rendered into a ConfigMap.
@@ -71,10 +71,14 @@ extraEnv:
 
 ## Public status page
 
+Give the status page its own domain: set it under **Status page → Custom domain** in the UI (e.g. `status.example.com`) and expose only that host. On it the agent serves just the status page, at `/`, plus heartbeat ping URLs; sign-in, the API and `/metrics` return 404 there, so the dashboard stays private (`kubectl port-forward`, or a second host on an internal ingress class).
+
 ```yaml
 ingress:
   enabled: true
   className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
   hosts:
     - host: status.example.com
       paths: ["/"]
@@ -106,7 +110,7 @@ ingress:
 | `persistence.enabled` | `true` | Keep data on a PVC (SQLite) |
 | `persistence.size` / `.storageClass` / `.existingClaim` | `1Gi` / `""` / `""` | PVC settings |
 | `service.type` / `.port` | `ClusterIP` / `80` | Service |
-| `ingress.*` | disabled | Ingress for the UI and status page |
+| `ingress.*` | disabled | Ingress; with the status page's custom domain as its host it serves only the status page |
 | `resources` | 20m CPU, 32Mi request; 128Mi limit | Container resources |
 | `extraEnv` | `[]` | Extra environment variables, e.g. passwords for `${VAR}` in targets |
 | `nodeSelector` / `tolerations` / `affinity` / `podAnnotations` | empty | Scheduling and pod metadata |

@@ -73,6 +73,11 @@ func (s *Server) saveStatusPageConfig(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if in.Domain != "" && in.Domain == statuspage.NormalizeHost(r.Host) {
+		// It would serve only the status page, signing everyone out here.
+		writeError(w, http.StatusBadRequest, "that's the address you're using for the dashboard; the status page needs its own, e.g. status.example.com")
+		return
+	}
 	existing, err := s.Store.ListMonitors(r.Context())
 	if err != nil {
 		s.internalError(w, r, err)
@@ -102,6 +107,7 @@ func (s *Server) saveStatusPageConfig(w http.ResponseWriter, r *http.Request) {
 		s.storeError(w, r, err)
 		return
 	}
+	s.setStatusDomain(in.Domain)
 	s.monitorsChanged(0)
 	s.getStatusPageConfig(w, r)
 }

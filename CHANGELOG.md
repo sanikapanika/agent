@@ -4,6 +4,12 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Added
+- **Custom domain for the status page:** set one (e.g. `status.example.com`) under Status page and that address shows the status page at its root, and serves nothing else but heartbeat pings: no sign-in, API or `/metrics`, so the dashboard can stay on a private address. DNS and TLS stay with your Ingress, Railway or proxy. The address you're using for the dashboard can't be chosen.
+
+### Changed
+- Two-factor setup: numbered steps, a framed QR code with the key behind "Can't scan it?", a code field that submits itself, and recovery codes you confirm you've saved before closing.
+
 ## [0.1.5] - 2026-10-03
 
 ### Added

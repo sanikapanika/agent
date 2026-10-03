@@ -10,11 +10,11 @@ import (
 
 func TestValidate(t *testing.T) {
 	p := Defaults()
-	p.Title, p.AccentColor = "  Acme  ", "#33A36B"
+	p.Title, p.AccentColor, p.Domain = "  Acme  ", "#33A36B", " https://Status.Acme.com/ "
 	if err := p.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if p.Title != "Acme" || p.AccentColor != "#33a36b" {
+	if p.Title != "Acme" || p.AccentColor != "#33a36b" || p.Domain != "status.acme.com" {
 		t.Fatalf("not cleaned up: %+v", p)
 	}
 
@@ -24,11 +24,28 @@ func TestValidate(t *testing.T) {
 		"javascript link":   func(p *Settings) { p.WebsiteURL = "javascript:alert(1)" },
 		"duplicate section": func(p *Settings) { p.Sections = append(p.Sections, p.Sections[0]) },
 		"unnamed section":   func(p *Settings) { p.Sections[0].Name = "" },
+		"domain with space": func(p *Settings) { p.Domain = "status acme.com" },
+		"bare name domain":  func(p *Settings) { p.Domain = "status" },
 	} {
 		p := Defaults()
 		change(&p)
 		if err := p.Validate(); err == nil {
 			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+func TestNormalizeHost(t *testing.T) {
+	for in, want := range map[string]string{
+		"status.acme.com":               "status.acme.com",
+		"Status.Acme.com:8080":          "status.acme.com",
+		"https://status.acme.com/x?y=1": "status.acme.com",
+		"status.acme.com.":              "status.acme.com",
+		"[::1]:8080":                    "[::1]",
+		"":                              "",
+	} {
+		if got := NormalizeHost(in); got != want {
+			t.Errorf("NormalizeHost(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

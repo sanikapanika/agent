@@ -79,6 +79,9 @@ service:
   type: ClusterIP
   port: 80
 
+# Set the host below as the status page's custom domain in the UI (Status page
+# → Custom domain) and the Ingress serves only the status page: no sign-in,
+# API or /metrics on it. Reach the dashboard with kubectl port-forward.
 ingress:
   enabled: false
   className: ""
