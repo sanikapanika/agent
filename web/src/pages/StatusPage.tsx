@@ -2,7 +2,7 @@
 // status pages (upti.my-status) so every agent status page reads as Uptimy.
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle, ExternalLink, XCircle, Wrench } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle, ExternalLink, XCircle, Wrench } from "lucide-react";
 import { api, type PublicMonitor, type PublicStatus, type Status, type PublicMaintenance } from "@/lib/api";
 import { cn, formatDateTime, timeAgo } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { PoweredBy } from "@/components/brand";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { ErrorNote } from "@/components/Layout";
+import { IncidentCard, NoticeCard } from "@/components/status-page/incidents";
 
 const brandText = "text-[#268256] dark:text-[#65bd91]"; // emerald-600 / 400 in the Uptimy ramp
 
@@ -44,6 +45,15 @@ const banners: Record<
     title: "Maintenance in Progress",
     subtitle: "Some services are under planned maintenance",
   },
+  degraded: {
+    icon: AlertTriangle,
+    iconColor: "text-degraded",
+    iconBg: "bg-degraded/10",
+    tint: "bg-degraded/5",
+    titleColor: "text-orange-600 dark:text-orange-400",
+    title: "Some Issues Detected",
+    subtitle: "Some systems are experiencing issues",
+  },
   outage: {
     icon: XCircle,
     iconColor: "text-down",
@@ -72,6 +82,9 @@ export function StatusPage() {
   });
   const s = status.data;
   const title = s?.title;
+  const notices = s?.incidents.filter((i) => i.kind === "notice") ?? [];
+  const active = s?.incidents.filter((i) => i.kind === "incident" && !i.resolved_at) ?? [];
+  const past = s?.incidents.filter((i) => i.kind === "incident" && i.resolved_at) ?? [];
   useEffect(() => {
     if (title) document.title = title;
   }, [title]);
@@ -119,6 +132,23 @@ export function StatusPage() {
               )}
             </div>
             <Banner overall={s.overall} />
+            {notices.map((n) => (
+              <div key={n.created_at} className="mt-4">
+                <NoticeCard notice={n} />
+              </div>
+            ))}
+            {active.length > 0 && (
+              <section className="mt-8">
+                <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+                  Active incidents
+                </h2>
+                <div className="flex flex-col gap-4">
+                  {active.map((i) => (
+                    <IncidentCard key={i.created_at} incident={i} />
+                  ))}
+                </div>
+              </section>
+            )}
             {s.maintenance.map((n) => (
               <MaintenanceNotice key={`${n.title}-${n.starts_at}`} n={n} />
             ))}
@@ -145,12 +175,23 @@ export function StatusPage() {
               ))
             )}
 
-            {s.incidents.length > 0 && (
+            {past.length > 0 && (
+              <Card className="mt-8">
+                <SectionHeader title="Past incidents" />
+                <CardContent className="flex flex-col gap-4 p-3 sm:p-6">
+                  {past.map((i) => (
+                    <IncidentCard key={i.created_at} incident={i} />
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {s.events.length > 0 && (
               <Card className="mt-8">
                 <SectionHeader title="Recent events" />
                 <CardContent className="p-3 sm:p-6">
                   <ol className="divide-y">
-                    {s.incidents.map((e, i) => (
+                    {s.events.map((e, i) => (
                       <li key={i} className="flex items-baseline justify-between gap-4 py-3 text-sm">
                         <span>
                           <span className="font-medium">{e.monitor}</span>{" "}

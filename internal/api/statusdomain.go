@@ -10,9 +10,9 @@ import (
 
 // The status page's own domain (statuspage.Settings.Domain), e.g.
 // status.example.com, serves only the status page: the page itself at "/",
-// what it loads, and heartbeat pings, so jobs outside the network can reach
-// /ping on the one public address. Sign-in, the API and /metrics aren't
-// there, so the dashboard can stay on a private address.
+// what it loads, badges, and heartbeat pings, so jobs outside the network
+// can reach /ping on the one public address. Sign-in, the API and /metrics
+// aren't there, so the dashboard can stay on a private address.
 
 // statusViewMeta tells the web UI to show only the status page.
 const statusViewMeta = `<meta name="uptimy-view" content="status">`
@@ -39,7 +39,7 @@ func (s *Server) statusDomainOnly(next, ui http.Handler) http.Handler {
 		case p == "/status":
 			http.Redirect(w, r, "/", http.StatusMovedPermanently)
 		case p == "/healthz", p == "/api/status", strings.HasPrefix(p, "/api/status/logo/"),
-			strings.HasPrefix(p, "/ping/"),
+			strings.HasPrefix(p, "/ping/"), strings.HasPrefix(p, "/badge/"),
 			strings.HasPrefix(p, "/assets/"), strings.HasPrefix(p, "/brand/"), p == "/favicon.svg":
 			next.ServeHTTP(w, r)
 		default:

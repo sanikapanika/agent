@@ -224,6 +224,42 @@ export interface Notifier {
 
 export type NotifierInput = Omit<Notifier, "id" | "created_at">;
 
+// ── Incidents ─────────────────────────────────────────────────────────────
+
+export type IncidentKind = "incident" | "notice";
+export type IncidentStatus = "investigating" | "identified" | "monitoring" | "resolved";
+export type IncidentSeverity = "low" | "medium" | "high" | "critical";
+
+/** An incident or notice posted on the status page (internal/incident). */
+export interface Incident {
+  id: number;
+  kind: IncidentKind;
+  title: string;
+  severity: IncidentSeverity | "";
+  /** The latest update's; "" for a notice that's still shown. */
+  status: IncidentStatus | "";
+  monitor_ids: number[];
+  created_at: string;
+  resolved_at: string | null;
+  updates: IncidentUpdate[]; // newest first
+}
+
+export interface IncidentUpdate {
+  id: number;
+  status: IncidentStatus | "";
+  message: string;
+  created_at: string;
+}
+
+export interface NewIncident {
+  kind: IncidentKind;
+  title: string;
+  severity: IncidentSeverity | "";
+  status: IncidentStatus | "";
+  message: string;
+  monitor_ids: number[];
+}
+
 // ── Maintenance ───────────────────────────────────────────────────────────
 
 /** A maintenance window (internal/maintenance.Window). */
@@ -392,11 +428,25 @@ export interface PublicStatus {
   logos: StatusPageLogos;
   accent_color: string; // "" = Uptimy green
   website_url: string;
-  overall: "operational" | "outage" | "maintenance";
+  overall: "operational" | "degraded" | "outage" | "maintenance";
   maintenance: PublicMaintenance[];
   sections: { name: string; monitors: PublicMonitor[] }[];
-  incidents: { monitor: string; status: Status; time: string }[];
+  /** Posted incidents (open and recently resolved) and current notices. */
+  incidents: PublicIncident[];
+  /** Monitors going down and recovering. */
+  events: { monitor: string; status: Status; time: string }[];
   updated: string;
+}
+
+export interface PublicIncident {
+  kind: IncidentKind;
+  title: string;
+  severity?: IncidentSeverity;
+  status: IncidentStatus | "";
+  monitors: string[]; // public names of affected monitors on the page
+  created_at: string;
+  resolved_at?: string;
+  updates: { status?: IncidentStatus; message: string; time: string }[]; // newest first
 }
 
 export interface StatusSection {
@@ -537,6 +587,18 @@ export const api = {
     request<Monitor>("POST", `/api/${kind}s/${id}/pause`, { paused }),
   deleteMonitor: (kind: MonitorKind, id: number) => request<void>("DELETE", `/api/${kind}s/${id}`),
   events: (id: number) => request<MonitorEvent[]>("GET", `/api/monitors/${id}/events`),
+
+  incidents: () => request<Incident[]>("GET", "/api/incidents"),
+  createIncident: (i: NewIncident) => request<Incident>("POST", "/api/incidents", i),
+  updateIncident: (id: number, i: { title: string; severity: IncidentSeverity | ""; monitor_ids: number[] }) =>
+    request<Incident>("PUT", `/api/incidents/${id}`, i),
+  deleteIncident: (id: number) => request<void>("DELETE", `/api/incidents/${id}`),
+  addIncidentUpdate: (id: number, u: { status: IncidentStatus | ""; message: string }) =>
+    request<Incident>("POST", `/api/incidents/${id}/updates`, u),
+  editIncidentUpdate: (id: number, updateID: number, message: string) =>
+    request<Incident>("PUT", `/api/incidents/${id}/updates/${updateID}`, { message }),
+  deleteIncidentUpdate: (id: number, updateID: number) =>
+    request<Incident>("DELETE", `/api/incidents/${id}/updates/${updateID}`),
 
   maintenance: () => request<MaintenanceWindow[]>("GET", "/api/maintenance"),
   createMaintenance: (w: MaintenanceInput) => request<MaintenanceWindow>("POST", "/api/maintenance", w),

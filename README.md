@@ -30,6 +30,8 @@ Because it runs next to your services, it can check things that external monitor
 - **Alerts:** email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty, webhooks, Uptimy (alerts become incidents there, which can run workflows), and 30+ more services through one [Shoutrrr](https://shoutrrr.nickfedor.com/latest/services/overview/) URL (Pushover, Gotify, Matrix, Google Chat, Mattermost, Opsgenie, Signal, ...), fired on down and on recovery, with a consecutive-failure threshold to avoid flapping. Each channel alerts for every monitor or only the ones you choose
 - **Maintenance windows:** planned work doesn't page anyone, and is announced on the status page. A monitor that's still down when the window ends alerts then
 - **Status page:** public, at `/status` or on its own domain (`status.example.com`), which serves only the status page so sign-in and the dashboard stay private. Admins set a logo (with an optional dark-mode version), accent color and website link, create sections and drag monitors into order with public names, with a live preview, much like the Uptimy app. New monitors stay off the page until you add them. It shows names with uptime (healthchecks) or on-time runs (heartbeats) only, never internal hostnames
+- **Incidents and notices:** tell visitors what's going on with an incident (severity, affected monitors, and a timeline from investigating to resolved) or a notice for news like a migration, posted under **Incidents**
+- **Badges:** SVG badges for READMEs with the page's overall status, or a monitor's status or uptime over 24 hours, 7, 30 or 90 days; copy them from the status page editor
 - **GitOps-friendly:** define monitors in YAML (a file, a ConfigMap or an env var), or click them together in the UI. Script everything else with [API tokens](#api)
 - **Switching from Uptime Kuma:** import its monitors and notifications in a few clicks; see [below](#switching-from-uptime-kuma)
 - **Light:** one static Go binary with an embedded SQLite database (pure Go, no CGO) in a distroless image: a 9 MB download. It uses 8 MiB of memory idle and 24 MiB with 350 monitors, a fraction of Uptime Kuma's 130–160 MiB ([benchmark](bench/uptime-kuma/README.md))
@@ -221,6 +223,22 @@ For anything without its own channel, add a **More services (Shoutrrr)** channel
 ### Maintenance
 
 Schedule maintenance under **Maintenance** before deploys, upgrades or migrations: for all monitors or some, starting now or later. During the window the monitors keep being checked, but nobody is alerted. If one is still down when the window ends, its alert goes out then; if it recovered, nothing is sent. Public windows are announced on the status page up to a week ahead, and the affected monitors are marked as under maintenance rather than down.
+
+### Incidents
+
+Under **Incidents**, report an incident when something's wrong that visitors should hear about: a title, a severity (low, medium, high or critical), the monitors it affects, and a first update. Post updates as it moves from investigating to identified, monitoring and resolved; the status page shows the whole timeline, and resolved incidents stay listed for 14 days. While one is open, the page's headline says "Some Issues Detected", or "Outage Detected" for a critical one. A **notice** is an announcement shown at the top of the page until you end it. Updates can be corrected later, and deleting a resolution reopens the incident. Posting doesn't alert anyone; monitors do that.
+
+### Badges
+
+Badges are served while the status page is on, and only for monitors on it:
+
+| Badge | URL |
+|---|---|
+| The page's overall status | `/badge/status.svg` |
+| A monitor's status | `/badge/<id>/status.svg` |
+| Its uptime, or a heartbeat's on-time rate | `/badge/<id>/uptime.svg?period=24h` (`7d`, `30d` (default), `90d`) |
+
+`?label=` replaces the left-hand text. The status page editor lists them with Markdown to copy, linking to the page.
 
 ## API
 

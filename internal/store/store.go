@@ -209,6 +209,31 @@ var migrations = []string{
 		code_hash TEXT NOT NULL,
 		PRIMARY KEY (user_id, code_hash)
 	);`,
+
+	// 5: incidents and notices posted on the status page, with their
+	// timeline and the monitors they affect.
+	`CREATE TABLE incidents (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		kind TEXT NOT NULL,
+		title TEXT NOT NULL,
+		severity TEXT NOT NULL DEFAULT '',
+		created_at INTEGER NOT NULL,
+		resolved_at INTEGER
+	);
+	CREATE INDEX incidents_resolved ON incidents(resolved_at);
+	CREATE TABLE incident_updates (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		incident_id INTEGER NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+		status TEXT NOT NULL DEFAULT '',
+		message TEXT NOT NULL,
+		created_at INTEGER NOT NULL
+	);
+	CREATE INDEX incident_updates_incident ON incident_updates(incident_id);
+	CREATE TABLE incident_monitors (
+		incident_id INTEGER NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+		monitor_id INTEGER NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+		PRIMARY KEY (incident_id, monitor_id)
+	);`,
 }
 
 func (s *Store) migrate(ctx context.Context) error {

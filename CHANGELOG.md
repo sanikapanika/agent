@@ -5,9 +5,12 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 ## [Unreleased]
 
 ### Added
+- **Incidents and notices** on the status page, under the new **Incidents** page: an incident has a severity, the monitors it affects and a timeline of updates from investigating to resolved, and stays listed for 14 days once resolved; a notice is an announcement shown until you end it. An open incident turns the page's headline to "Some Issues Detected" ("Outage Detected" when critical).
+- **Badges** for READMEs: `/badge/status.svg` for the page's overall status, and `/badge/<id>/status.svg` and `/badge/<id>/uptime.svg?period=24h|7d|30d|90d` for each monitor on the status page. The status page editor lists them with Markdown to copy.
 - **Custom domain for the status page:** set one (e.g. `status.example.com`) under Status page and that address shows the status page at its root, and serves nothing else but heartbeat pings: no sign-in, API or `/metrics`, so the dashboard can stay on a private address. DNS and TLS stay with your Ingress, Railway or proxy. The address you're using for the dashboard can't be chosen.
 
 ### Changed
+- The public status API lists monitors going down and recovering under `events`; `incidents` now holds posted incidents and notices.
 - Two-factor setup: numbered steps, a framed QR code with the key behind "Can't scan it?", a code field that submits itself, and recovery codes you confirm you've saved before closing.
 
 ## [0.1.5] - 2026-10-03

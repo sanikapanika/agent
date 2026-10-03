@@ -5,7 +5,7 @@ Open-source, self-hosted uptime monitoring that runs inside your cluster. It che
 - **Healthchecks:** HTTP(S) with status and keyword checks, TCP, ping, DNS, TLS certificate expiry, Postgres, MySQL and Redis (a real login and query), and Kubernetes Deployments, StatefulSets and DaemonSets with fewer ready replicas than they should have.
 - **Heartbeats** for CronJobs, backups and workers: an interval or a cron schedule in any time zone, with missed and failed runs, exit codes and durations.
 - **Alerts** by email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty, webhooks, Uptimy and 30+ more services through a Shoutrrr URL.
-- **Status page** at `/status`, or on its own domain with nothing else exposed there, with your logo, sections and public names. It never shows internal hostnames.
+- **Status page** at `/status`, or on its own domain with nothing else exposed there, with your logo, sections, public names, incident updates and README badges. It never shows internal hostnames.
 - **Auto-discovery:** label a Service, Ingress, HTTPRoute, workload or CronJob with `upti.my/monitor: "true"` and it's monitored within 30 seconds.
 - **CronJobs without pings:** a labeled CronJob gets a heartbeat whose runs are read from its Jobs: start, finish, duration, and why it failed (exit code, OOMKilled).
 - **Monitors in Git:** or put them in `values.yaml` and they're rendered into a ConfigMap.

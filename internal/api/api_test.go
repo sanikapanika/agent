@@ -231,12 +231,12 @@ func TestStatusPageShowsOnlyRealRecoveries(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("status: %d", code)
 	}
-	incidents := body["incidents"].([]any)
-	if len(incidents) != 2 {
-		t.Fatalf("want down + recovery only, got %v", incidents)
+	events := body["events"].([]any)
+	if len(events) != 2 {
+		t.Fatalf("want down + recovery only, got %v", events)
 	}
-	if incidents[0].(map[string]any)["status"] != "up" || incidents[1].(map[string]any)["status"] != "down" {
-		t.Fatalf("unexpected order/status: %v", incidents)
+	if events[0].(map[string]any)["status"] != "up" || events[1].(map[string]any)["status"] != "down" {
+		t.Fatalf("unexpected order/status: %v", events)
 	}
 }
 

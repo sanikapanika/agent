@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   Bell,
+  Siren,
   Wrench,
   FileText,
   HeartPulse,
@@ -44,6 +45,7 @@ const nav: { to: string; label: string; icon: LucideIcon; end?: boolean; adminOn
   { to: "/healthchecks", label: "Healthchecks", icon: HeartPulse },
   { to: "/heartbeats", label: "Heartbeats", icon: Activity },
   { to: "/status-page", label: "Status page", icon: FileText },
+  { to: "/incidents", label: "Incidents", icon: Siren },
   { to: "/maintenance", label: "Maintenance", icon: Wrench },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/users", label: "Users", icon: Users, adminOnly: true },

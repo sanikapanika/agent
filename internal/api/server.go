@@ -56,7 +56,8 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	mux.HandleFunc("POST /api/auth/logout", s.logout)
 	mux.HandleFunc("GET /api/status", s.publicStatus)
 	mux.HandleFunc("GET /api/status/logo/{variant}", s.statusPageLogo)
-	s.pingRoutes(mux) // heartbeat pings: /ping/<token>
+	s.pingRoutes(mux)  // heartbeat pings: /ping/<token>
+	s.badgeRoutes(mux) // README badges: /badge/...
 
 	// Authenticated.
 	auth := func(pattern string, h http.HandlerFunc) { mux.Handle(pattern, s.requireAuth(h)) }
@@ -105,6 +106,14 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	auth("PUT /api/maintenance/{id}", s.updateMaintenance)
 	auth("POST /api/maintenance/{id}/end", s.endMaintenance)
 	auth("DELETE /api/maintenance/{id}", s.deleteMaintenance)
+
+	auth("GET /api/incidents", s.listIncidents)
+	auth("POST /api/incidents", s.createIncident)
+	auth("PUT /api/incidents/{id}", s.updateIncident)
+	auth("DELETE /api/incidents/{id}", s.deleteIncident)
+	auth("POST /api/incidents/{id}/updates", s.addIncidentUpdate)
+	auth("PUT /api/incidents/{id}/updates/{update}", s.editIncidentUpdate)
+	auth("DELETE /api/incidents/{id}/updates/{update}", s.deleteIncidentUpdate)
 
 	auth("GET /api/monitors/{id}/events", s.monitorEvents)
 	auth("GET /api/activity", s.activity)

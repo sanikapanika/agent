@@ -12,6 +12,7 @@ import { HeartbeatForm } from "@/pages/HeartbeatForm";
 import { HeartbeatDetail } from "@/pages/HeartbeatDetail";
 import { Notifications } from "@/pages/Notifications";
 import { MaintenancePage } from "@/pages/Maintenance";
+import { IncidentsPage } from "@/pages/Incidents";
 import { Settings } from "@/pages/Settings";
 import { KubernetesPage } from "@/pages/Kubernetes";
 import { Users } from "@/pages/Users";
@@ -108,6 +109,7 @@ createRoot(document.getElementById("root")!).render(
                 <Route path=":id/edit" element={<HeartbeatForm />} />
               </Route>
               <Route path="maintenance" element={<MaintenancePage />} />
+              <Route path="incidents" element={<IncidentsPage />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="users" element={<Users />} />
               <Route path="status-page" element={<StatusPageEditor />} />

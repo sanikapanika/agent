@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, FileText, Globe, RotateCcw, RotateCw } from "lucide-react";
+import { CopyButton } from "@/components/ui/copy-button";
 import { api, type StatusPageConfig, type StatusPageLogos } from "@/lib/api";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,145 +81,150 @@ export function StatusPageEditor() {
       <ErrorNote error={config.error} />
       {draft && (
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              save.mutate();
-            }}
-          >
-            <fieldset disabled={!canEdit} className="flex flex-col gap-6">
-              {!canEdit && (
-                <p className="rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                  You have read-only access. Ask an admin to change the status page.
-                </p>
-              )}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Page</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-5">
-                  <Switch
-                    id="sp-enabled"
-                    checked={draft.enabled}
-                    onChange={(v) => set("enabled", v)}
-                    label="Publish the status page"
-                  />
-                  <Field
-                    label="Title"
-                    htmlFor="sp-title"
-                    hint="Shown when there's no logo, and as the browser tab title."
-                  >
-                    <Input
-                      id="sp-title"
-                      required
-                      maxLength={100}
-                      value={draft.title}
-                      onChange={(e) => set("title", e.target.value)}
+          <div className="flex min-w-0 flex-col gap-6">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                save.mutate();
+              }}
+            >
+              <fieldset disabled={!canEdit} className="flex flex-col gap-6">
+                {!canEdit && (
+                  <p className="rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                    You have read-only access. Ask an admin to change the status page.
+                  </p>
+                )}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Page</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-5">
+                    <Switch
+                      id="sp-enabled"
+                      checked={draft.enabled}
+                      onChange={(v) => set("enabled", v)}
+                      label="Publish the status page"
                     />
-                  </Field>
-                  <Field
-                    label="Description"
-                    htmlFor="sp-desc"
-                    hint="Optional. Shown under the title, e.g. who to contact during an outage."
-                  >
-                    <Textarea
-                      id="sp-desc"
-                      maxLength={500}
-                      rows={3}
-                      value={draft.description}
-                      onChange={(e) => set("description", e.target.value)}
-                    />
-                  </Field>
-                  <Switch
-                    id="sp-events"
-                    checked={draft.show_events}
-                    onChange={(v) => set("show_events", v)}
-                    label="Show recent events (outages and recoveries)"
-                  />
-                </CardContent>
-              </Card>
-
-              <DomainCard value={draft.domain} onChange={(v) => set("domain", v)} />
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Branding</CardTitle>
-                  <CardDescription>Make the page look like yours.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-5">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <LogoField
-                      variant="light"
-                      label="Logo"
-                      hint="Replaces the title. PNG, SVG, JPEG or WebP, up to 512 KB."
-                      url={draft.logos.light}
-                      onChange={applyLogos}
-                      disabled={!canEdit}
-                    />
-                    <LogoField
-                      variant="dark"
-                      label="Logo for dark mode"
-                      hint="Optional. Otherwise the logo above is used."
-                      url={draft.logos.dark}
-                      onChange={applyLogos}
-                      disabled={!canEdit}
-                    />
-                  </div>
-                  <Field label="Accent color" htmlFor="sp-accent" hint="Used for section headings.">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        aria-label="Pick accent color"
-                        value={draft.accent_color || DEFAULT_ACCENT}
-                        onChange={(e) => set("accent_color", e.target.value)}
-                        className="h-9 w-12 shrink-0 cursor-pointer rounded-md border bg-card p-1"
-                      />
+                    <Field
+                      label="Title"
+                      htmlFor="sp-title"
+                      hint="Shown when there's no logo, and as the browser tab title."
+                    >
                       <Input
-                        id="sp-accent"
-                        className="w-32 font-mono"
-                        placeholder={DEFAULT_ACCENT}
-                        maxLength={7}
-                        value={draft.accent_color}
-                        onChange={(e) => set("accent_color", e.target.value)}
+                        id="sp-title"
+                        required
+                        maxLength={100}
+                        value={draft.title}
+                        onChange={(e) => set("title", e.target.value)}
                       />
-                      {draft.accent_color && (
-                        <Button variant="ghost" size="sm" onClick={() => set("accent_color", "")}>
-                          <RotateCcw /> Default
-                        </Button>
-                      )}
-                    </div>
-                  </Field>
-                  <Field label="Website" htmlFor="sp-website" hint='Adds a "Visit website" link to the header.'>
-                    <Input
-                      id="sp-website"
-                      type="url"
-                      placeholder="https://example.com"
-                      maxLength={300}
-                      value={draft.website_url}
-                      onChange={(e) => set("website_url", e.target.value)}
+                    </Field>
+                    <Field
+                      label="Description"
+                      htmlFor="sp-desc"
+                      hint="Optional. Shown under the title, e.g. who to contact during an outage."
+                    >
+                      <Textarea
+                        id="sp-desc"
+                        maxLength={500}
+                        rows={3}
+                        value={draft.description}
+                        onChange={(e) => set("description", e.target.value)}
+                      />
+                    </Field>
+                    <Switch
+                      id="sp-events"
+                      checked={draft.show_events}
+                      onChange={(v) => set("show_events", v)}
+                      label="Show recent events (outages and recoveries)"
                     />
-                  </Field>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
 
-              <SectionsEditor draft={draft} onChange={edit} />
+                <DomainCard value={draft.domain} onChange={(v) => set("domain", v)} />
 
-              {canEdit && (
-                <div className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-lg border bg-card/95 px-4 py-3 shadow-sm backdrop-blur">
-                  <ErrorNote error={save.error} />
-                  <span className="mr-auto text-sm text-muted-foreground">
-                    {dirty ? "Unsaved changes" : "Up to date"}
-                  </span>
-                  <Button variant="ghost" disabled={!dirty || save.isPending} onClick={() => setEdits(null)}>
-                    Discard
-                  </Button>
-                  <Button type="submit" disabled={!dirty || save.isPending || domainClash}>
-                    {save.isPending ? "Saving…" : "Save changes"}
-                  </Button>
-                </div>
-              )}
-            </fieldset>
-          </form>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Branding</CardTitle>
+                    <CardDescription>Make the page look like yours.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <LogoField
+                        variant="light"
+                        label="Logo"
+                        hint="Replaces the title. PNG, SVG, JPEG or WebP, up to 512 KB."
+                        url={draft.logos.light}
+                        onChange={applyLogos}
+                        disabled={!canEdit}
+                      />
+                      <LogoField
+                        variant="dark"
+                        label="Logo for dark mode"
+                        hint="Optional. Otherwise the logo above is used."
+                        url={draft.logos.dark}
+                        onChange={applyLogos}
+                        disabled={!canEdit}
+                      />
+                    </div>
+                    <Field label="Accent color" htmlFor="sp-accent" hint="Used for section headings.">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          aria-label="Pick accent color"
+                          value={draft.accent_color || DEFAULT_ACCENT}
+                          onChange={(e) => set("accent_color", e.target.value)}
+                          className="h-9 w-12 shrink-0 cursor-pointer rounded-md border bg-card p-1"
+                        />
+                        <Input
+                          id="sp-accent"
+                          className="w-32 font-mono"
+                          placeholder={DEFAULT_ACCENT}
+                          maxLength={7}
+                          value={draft.accent_color}
+                          onChange={(e) => set("accent_color", e.target.value)}
+                        />
+                        {draft.accent_color && (
+                          <Button variant="ghost" size="sm" onClick={() => set("accent_color", "")}>
+                            <RotateCcw /> Default
+                          </Button>
+                        )}
+                      </div>
+                    </Field>
+                    <Field label="Website" htmlFor="sp-website" hint='Adds a "Visit website" link to the header.'>
+                      <Input
+                        id="sp-website"
+                        type="url"
+                        placeholder="https://example.com"
+                        maxLength={300}
+                        value={draft.website_url}
+                        onChange={(e) => set("website_url", e.target.value)}
+                      />
+                    </Field>
+                  </CardContent>
+                </Card>
+
+                <SectionsEditor draft={draft} onChange={edit} />
+
+                {canEdit && (
+                  <div className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-lg border bg-card/95 px-4 py-3 shadow-sm backdrop-blur">
+                    <ErrorNote error={save.error} />
+                    <span className="mr-auto text-sm text-muted-foreground">
+                      {dirty ? "Unsaved changes" : "Up to date"}
+                    </span>
+                    <Button variant="ghost" disabled={!dirty || save.isPending} onClick={() => setEdits(null)}>
+                      Discard
+                    </Button>
+                    <Button type="submit" disabled={!dirty || save.isPending || domainClash}>
+                      {save.isPending ? "Saving…" : "Save changes"}
+                    </Button>
+                  </div>
+                )}
+              </fieldset>
+            </form>
+            {config.data?.enabled && (
+              <BadgesCard config={config.data} base={domain ? `https://${domain}` : window.location.origin} />
+            )}
+          </div>
 
           <Card className="overflow-hidden xl:sticky xl:top-20">
             <div className="flex items-center justify-between border-b px-4 py-2.5">
@@ -308,6 +315,77 @@ function DomainCard({ value, onChange }: { value: string; onChange: (v: string) 
             That's the address you're using right now. Use a separate one for the status page, or this address would
             show only the status page and you'd lose the dashboard here.
           </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+type BadgeType = "status" | "24h" | "7d" | "30d";
+
+/** Badges for READMEs: the page's overall status and each monitor on it. */
+function BadgesCard({ config, base }: { config: StatusPageConfig; base: string }) {
+  const [type, setType] = useState<BadgeType>("status");
+  // On its own domain the page is at the root.
+  const page = base === window.location.origin ? `${base}/status` : `${base}/`;
+  const monitors = config.monitors.filter((m) => m.public);
+  const url = (id: number) =>
+    type === "status" ? `${base}/badge/${id}/status.svg` : `${base}/badge/${id}/uptime.svg?period=${type}`;
+  const rows = [
+    { key: "overall", name: config.title, src: `${base}/badge/status.svg` },
+    ...monitors.map((m) => ({ key: String(m.id), name: m.label || m.name, src: url(m.id) })),
+  ];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Badges</CardTitle>
+        <CardDescription>
+          For a README or wiki. They link to the status page and exist only for monitors on it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex w-fit gap-1 rounded-md bg-muted p-0.5" role="radiogroup" aria-label="Badge type">
+          {(
+            [
+              ["status", "Status"],
+              ["24h", "Uptime 24h"],
+              ["7d", "7 days"],
+              ["30d", "30 days"],
+            ] as const
+          ).map(([t, label]) => (
+            <button
+              key={t}
+              type="button"
+              role="radio"
+              aria-checked={type === t}
+              onClick={() => setType(t)}
+              className={cn(
+                "rounded px-3 py-1.5 text-sm font-medium",
+                type === t ? "bg-card shadow-xs" : "text-muted-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <ul className="divide-y rounded-lg border">
+          {rows.map((r, i) => {
+            const markdown = `[![${r.name}](${r.src})](${page})`;
+            return (
+              <li key={r.key} className="flex items-center gap-3 px-3 py-2">
+                <span className="min-w-0 flex-1 truncate text-sm">
+                  {r.name}
+                  {i === 0 && <span className="text-muted-foreground"> · overall</span>}
+                </span>
+                {/* Served from this agent, so the preview works before DNS does. */}
+                <img src={r.src.replace(base, "")} alt="" className="h-5" />
+                <CopyButton text={markdown} label="Copy Markdown" />
+              </li>
+            );
+          })}
+        </ul>
+        {monitors.length === 0 && (
+          <p className="text-sm text-muted-foreground">Add monitors to the page to get a badge for each.</p>
         )}
       </CardContent>
     </Card>

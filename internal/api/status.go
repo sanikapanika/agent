@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/uptimy/agent/internal/incident"
 	"github.com/uptimy/agent/internal/maintenance"
 	"github.com/uptimy/agent/internal/monitor"
 	"github.com/uptimy/agent/internal/statuspage"
@@ -52,10 +54,30 @@ type publicSection struct {
 	Monitors []publicMonitor `json:"monitors"`
 }
 
-type publicIncident struct {
+// publicEvent is a monitor going down or recovering.
+type publicEvent struct {
 	Monitor string         `json:"monitor"`
 	Status  monitor.Status `json:"status"`
 	Time    time.Time      `json:"time"`
+}
+
+// publicIncident is a posted incident or notice. Monitors are the public
+// names of the affected monitors on the page.
+type publicIncident struct {
+	Kind       incident.Kind     `json:"kind"`
+	Title      string            `json:"title"`
+	Severity   incident.Severity `json:"severity,omitempty"`
+	Status     incident.Status   `json:"status"`
+	Monitors   []string          `json:"monitors"`
+	CreatedAt  time.Time         `json:"created_at"`
+	ResolvedAt *time.Time        `json:"resolved_at,omitempty"`
+	Updates    []publicUpdate    `json:"updates"`
+}
+
+type publicUpdate struct {
+	Status  incident.Status `json:"status,omitempty"`
+	Message string          `json:"message"`
+	Time    time.Time       `json:"time"`
 }
 
 func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +98,7 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 	since := time.Now().Add(-statusPageDays * 24 * time.Hour)
 	names := map[int64]string{}
 	bySection := map[string][]publicMonitor{}
-	overall := "operational"
+	anyDown := false
 	for _, m := range statuspage.Ordered(monitors) {
 		if !m.Public {
 			continue
@@ -94,11 +116,7 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		pm.InMaintenance = s.publicMaintenanceCovers(m.ID)
-		// Same rule as the hosted Uptimy status pages: anything down is an
-		// outage, unless it's down for announced maintenance.
-		if pm.Status == monitor.StatusDown && !pm.InMaintenance {
-			overall = "outage"
-		}
+		anyDown = anyDown || (pm.Status == monitor.StatusDown && !pm.InMaintenance)
 		sec := settings.SectionOf(m)
 		bySection[sec] = append(bySection[sec], pm)
 	}
@@ -124,7 +142,7 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 	// ends an outage; the first successful check after startup isn't news.
 	// Walking newest→oldest, an up is a recovery if the next older
 	// up/down event for that monitor is a down.
-	incidents := []publicIncident{}
+	changes := []publicEvent{}
 	if !settings.ShowEvents {
 		events = nil
 	}
@@ -135,19 +153,19 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if i, ok := pendingUp[e.MonitorID]; ok && e.Status == monitor.StatusUp {
-			incidents[i].Status = "" // previous event was up too: not a recovery
+			changes[i].Status = "" // previous event was up too: not a recovery
 		}
 		delete(pendingUp, e.MonitorID)
-		incidents = append(incidents, publicIncident{Monitor: name, Status: e.Status, Time: e.Time})
+		changes = append(changes, publicEvent{Monitor: name, Status: e.Status, Time: e.Time})
 		if e.Status == monitor.StatusUp {
-			pendingUp[e.MonitorID] = len(incidents) - 1
+			pendingUp[e.MonitorID] = len(changes) - 1
 		}
 	}
 	for _, i := range pendingUp {
-		incidents[i].Status = "" // no older down: first check, not a recovery
+		changes[i].Status = "" // no older down: first check, not a recovery
 	}
-	shown := []publicIncident{}
-	for _, inc := range incidents {
+	shown := []publicEvent{}
+	for _, inc := range changes {
 		if inc.Status != "" {
 			shown = append(shown, inc)
 		}
@@ -156,14 +174,13 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	notices := s.publicMaintenance(names)
-	if overall == "operational" {
-		for _, n := range notices {
-			if n.Active {
-				overall = "maintenance"
-			}
-		}
+	posted, err := s.Store.ListIncidents(r.Context(), time.Now().Add(-incidentHistory))
+	if err != nil {
+		s.internalError(w, r, err)
+		return
 	}
+	published := publicIncidents(posted, names)
+	notices := s.publicMaintenance(names)
 
 	w.Header().Set("Cache-Control", "public, max-age=30")
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -172,12 +189,90 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 		"logos":        logos,
 		"accent_color": settings.AccentColor,
 		"website_url":  settings.WebsiteURL,
-		"overall":      overall,
+		"overall":      overallStatus(anyDown, published, notices),
 		"maintenance":  notices,
 		"sections":     sections,
-		"incidents":    shown,
+		"incidents":    published,
+		"events":       shown,
 		"updated":      time.Now().UTC(),
 	})
+}
+
+// overallStatus is the page's headline. Same rule as the hosted Uptimy
+// status pages: anything down is an outage, unless it's down for announced
+// maintenance. An open incident is "degraded", or an outage when critical.
+func overallStatus(anyDown bool, incidents []publicIncident, maintenance []publicMaintenance) string {
+	overall := "operational"
+	if anyDown {
+		overall = "outage"
+	}
+	for _, inc := range incidents {
+		if inc.Kind != incident.KindIncident || inc.ResolvedAt != nil {
+			continue
+		}
+		switch {
+		case inc.Severity == incident.Critical:
+			overall = "outage"
+		case overall != "outage":
+			overall = "degraded"
+		}
+	}
+	if overall == "operational" {
+		for _, n := range maintenance {
+			if n.Active {
+				overall = "maintenance"
+			}
+		}
+	}
+	return overall
+}
+
+// pageOverall is overallStatus for the page as it is now, without the
+// history the page itself shows.
+func (s *Server) pageOverall(ctx context.Context) (string, error) {
+	monitors, err := s.Store.ListMonitors(ctx)
+	if err != nil {
+		return "", err
+	}
+	names := map[int64]string{}
+	anyDown := false
+	for _, m := range monitors {
+		if !m.Public {
+			continue
+		}
+		names[m.ID] = m.PublicName()
+		anyDown = anyDown || (s.Scheduler.Status(m) == monitor.StatusDown && !s.publicMaintenanceCovers(m.ID))
+	}
+	posted, err := s.Store.ListIncidents(ctx, time.Now())
+	if err != nil {
+		return "", err
+	}
+	return overallStatus(anyDown, publicIncidents(posted, names), s.publicMaintenance(names)), nil
+}
+
+// publicIncidents is what the page shows of posted incidents: open and
+// recently resolved incidents, and notices that haven't ended.
+func publicIncidents(posted []incident.Incident, names map[int64]string) []publicIncident {
+	out := []publicIncident{}
+	for _, in := range posted {
+		if in.Kind == incident.KindNotice && !in.Open() {
+			continue
+		}
+		p := publicIncident{
+			Kind: in.Kind, Title: in.Title, Severity: in.Severity, Status: in.Status,
+			Monitors: []string{}, CreatedAt: in.CreatedAt, ResolvedAt: in.ResolvedAt, Updates: []publicUpdate{},
+		}
+		for _, id := range in.MonitorIDs {
+			if name, ok := names[id]; ok {
+				p.Monitors = append(p.Monitors, name)
+			}
+		}
+		for _, u := range in.Updates {
+			p.Updates = append(p.Updates, publicUpdate{Status: u.Status, Message: u.Message, Time: u.CreatedAt})
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 // stream pushes live updates to the UI over Server-Sent Events.
