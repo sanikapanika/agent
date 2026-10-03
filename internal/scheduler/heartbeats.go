@@ -254,6 +254,7 @@ func (t *heartbeatTracker) miss(ctx context.Context, due time.Time) {
 	}
 	t.anchor, t.state, t.missed = due, monitor.StateMissed, &run
 	t.s.hub.Publish(events.Message{Type: "run", MonitorID: t.m.ID, Data: run})
+	t.s.countRun(t.m.ID, monitor.OutcomeMissed)
 	t.transition(fmt.Sprintf("missed its run due %s", t.formatDue(due)))
 }
 
@@ -300,6 +301,7 @@ func (t *heartbeatTracker) handle(ctx context.Context, p ping, due, deadline tim
 	}
 	t.open, t.missed, t.anchor = nil, nil, now
 	t.s.hub.Publish(events.Message{Type: "run", MonitorID: t.m.ID, Data: run})
+	t.s.countRun(t.m.ID, run.Outcome)
 
 	if run.Outcome == monitor.OutcomeFailure {
 		t.state = monitor.StateFailed

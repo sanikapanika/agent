@@ -29,6 +29,7 @@ type Scheduler struct {
 	runners map[int64]runner
 	tokens  map[string]int64 // heartbeat ping token → monitor ID, paused ones too
 	maint   maintenanceState
+	stats   statsTable
 }
 
 // runner is the goroutine watching one monitor.
@@ -102,6 +103,7 @@ func (s *Scheduler) Upsert(m monitor.Monitor) {
 
 // Remove stops watching a deleted monitor.
 func (s *Scheduler) Remove(id int64) {
+	s.forgetStats(id)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.stopLocked(id)

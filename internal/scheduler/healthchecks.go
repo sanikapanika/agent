@@ -99,6 +99,7 @@ func (s *Scheduler) probe(ctx context.Context, r *healthcheckRunner, m monitor.M
 		s.log.Error("saving result", "monitor", m.Name, "err", err)
 	}
 	s.hub.Publish(events.Message{Type: "result", MonitorID: m.ID, Data: res})
+	s.countCheck(m.ID, res.OK, latency, start)
 
 	r.mu.Lock()
 	prev := r.current

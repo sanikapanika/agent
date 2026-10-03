@@ -1,0 +1,23 @@
+{{- if .Values.metrics.serviceMonitor.enabled }}
+# Scrapes /metrics with the Prometheus Operator. /metrics needs an API token
+# (a read-only one is enough), read from tokenSecret.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "uptimy-agent.fullname" . }}
+  labels:
+    {{- include "uptimy-agent.labels" . | nindent 4 }}
+    {{- with .Values.metrics.serviceMonitor.labels }}{{ toYaml . | nindent 4 }}{{- end }}
+spec:
+  selector:
+    matchLabels: {{- include "uptimy-agent.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      authorization:
+        type: Bearer
+        credentials:
+          name: {{ required "metrics.serviceMonitor.tokenSecret.name: a Secret with an Uptimy Agent API token" .Values.metrics.serviceMonitor.tokenSecret.name }}
+          key: {{ .Values.metrics.serviceMonitor.tokenSecret.key }}
+{{- end }}

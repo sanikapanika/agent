@@ -46,6 +46,19 @@ retentionDays: 30
 discovery:
   enabled: true
 
+# Prometheus metrics at /metrics: monitor status, check results, heartbeat
+# runs, discovery. Scraping needs an API token (Settings → API tokens in the
+# agent; read-only is enough) in a Secret:
+#   kubectl -n monitoring create secret generic uptimy-agent-metrics --from-literal=token=upa_...
+metrics:
+  serviceMonitor:
+    enabled: false        # needs the Prometheus Operator (monitoring.coreos.com CRDs)
+    interval: 60s
+    tokenSecret:
+      name: ""            # e.g. uptimy-agent-metrics
+      key: token
+    labels: {}            # e.g. release: kube-prometheus-stack, to match your Prometheus
+
 # Read-only access to Deployments/StatefulSets/DaemonSets for kubernetes
 # checks, plus listing labeled Services/Ingresses/HTTPRoutes for discovery.
 rbac:

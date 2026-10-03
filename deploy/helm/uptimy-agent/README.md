@@ -96,6 +96,9 @@ ingress:
 | `uptimy.existingSecret` | `""` | Secret with key `UPTIMY_HEARTBEAT_URL` |
 | `healthchecks` / `heartbeats` | `[]` | Monitors defined in values |
 | `retentionDays` | `30` | How long check results are kept |
+| `metrics.serviceMonitor.enabled` | `false` | Create a Prometheus Operator ServiceMonitor for `/metrics` |
+| `metrics.serviceMonitor.tokenSecret.name` / `.key` | `""` / `token` | Secret with an agent API token (read-only is enough); required when enabled |
+| `metrics.serviceMonitor.interval` / `.labels` | `60s` / `{}` | Scrape interval, and labels your Prometheus selects on |
 | `discovery.enabled` | `true` | Monitor resources labeled `upti.my/monitor: "true"` |
 | `rbac.create` | `true` | Read-only access for checks (Deployments, StatefulSets, DaemonSets, Services, EndpointSlices) and discovery (listing Services, Ingresses, HTTPRoutes, CronJobs, Jobs and pods) |
 | `rbac.clusterWide` | `true` | `false` limits that access to the release namespace |

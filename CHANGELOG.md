@@ -4,6 +4,9 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Added
+- Prometheus metrics at `/metrics`, with an API token: each monitor's status, check results and durations, heartbeat runs by outcome and next due time, maintenance, Kubernetes discovery, and the agent's version, goroutines and memory. Targets aren't exported. The chart can create a ServiceMonitor (`metrics.serviceMonitor`).
+
 ## [0.1.4] - 2026-10-02
 
 ### Added

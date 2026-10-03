@@ -57,6 +57,7 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 	// Authenticated.
 	auth := func(pattern string, h http.HandlerFunc) { mux.Handle(pattern, s.requireAuth(h)) }
 	auth("GET /api/info", s.info)
+	auth("GET /metrics", s.metrics)
 	auth("POST /api/auth/password", s.changePassword)
 	auth("GET /api/auth/sessions", s.sessions)
 	auth("POST /api/auth/sessions/sign-out-others", s.signOutOthers)
