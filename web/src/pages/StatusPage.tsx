@@ -7,8 +7,7 @@ import { api, type PublicMonitor, type PublicStatus, type Status } from "@/lib/a
 import { cn, formatDateTime, timeAgo } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DailyBars } from "@/components/status";
-import { PoweredBy, UptimyLogo } from "@/components/brand";
-import { buttonVariants } from "@/components/ui/button";
+import { PoweredBy } from "@/components/brand";
 import { MaintenanceCard } from "@/components/status-page/maintenance";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/lib/theme";
@@ -247,27 +246,13 @@ export function StatusPage() {
               </Card>
             )}
 
-            {/* As on hosted pages: the Uptimy card, or with it turned off a
-                "Powered by" line. */}
-            <footer className="mt-12 flex flex-col items-center gap-3 py-8 text-xs text-muted-foreground">
-              {s.uptimy_card ? (
-                <>
-                  <UptimyCard />
-                  <div className="mt-3">
-                    <ThemeToggle />
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <PoweredBy medium="status_page" />
-                  <span className="text-border">·</span>
-                  <ThemeToggle />
-                </div>
-              )}
-              <span className="flex items-center gap-1.5">
-                <span className="size-1.5 rounded-full bg-up" />
-                Updated {timeAgo(s.updated)}
-              </span>
+            <footer className="mt-10 flex flex-col items-center gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-3">
+                <PoweredBy medium="status_page" />
+                <span className="text-border">·</span>
+                <ThemeToggle />
+              </div>
+              <span>Last updated {timeAgo(s.updated)}</span>
             </footer>
           </>
         )}
@@ -278,40 +263,6 @@ export function StatusPage() {
 
 /** In progress first, then upcoming, then recently completed. */
 const maintenanceRank = { active: 0, scheduled: 1, ended: 2 } as const;
-
-const utm = (url: string) => `${url}?utm_source=uptimy-agent&utm_medium=footer_card&utm_campaign=status_page`;
-
-/** The hosted pages' footer card: what Uptimy is, and a way to try it. */
-function UptimyCard() {
-  return (
-    <div className="w-full rounded-lg border bg-card p-5">
-      <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-        <a href={utm("https://www.upti.my/")} target="_blank" rel="noopener" className="flex items-center gap-3">
-          <UptimyLogo className="h-8 sm:h-9" />
-          <span className="text-xs text-muted-foreground">Status Pages</span>
-        </a>
-        <div className="flex gap-2">
-          <a
-            href={utm("https://app.upti.my/")}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonVariants({ size: "sm", className: "text-xs" })}
-          >
-            Create Status Page
-          </a>
-          <a
-            href={utm("https://www.upti.my/docs/status-pages")}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonVariants({ size: "sm", variant: "outline", className: "text-xs" })}
-          >
-            Learn More
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function CountBadge({ className, children }: { className?: string; children: React.ReactNode }) {
   return (

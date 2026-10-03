@@ -196,7 +196,6 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 		"logos":        logos,
 		"accent_color": settings.AccentColor,
 		"website_url":  settings.WebsiteURL,
-		"uptimy_card":  !settings.HideUptimyCard,
 		"overall":      overallStatus(anyDown, published, notices),
 		"maintenance":  notices,
 		"sections":     sections,

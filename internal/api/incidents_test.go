@@ -42,9 +42,6 @@ func TestIncidents(t *testing.T) {
 		return body
 	}
 	p := public()
-	if p["uptimy_card"] != true {
-		t.Fatalf("the Uptimy card is on by default: %v", p["uptimy_card"])
-	}
 	if p["overall"] != "degraded" {
 		t.Fatalf("open incident: overall %v", p["overall"])
 	}

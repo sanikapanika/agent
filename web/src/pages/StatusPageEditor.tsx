@@ -41,7 +41,6 @@ export function StatusPageEditor() {
         accent_color: d.accent_color,
         website_url: d.website_url,
         domain: d.domain,
-        hide_uptimy_card: d.hide_uptimy_card,
         sections: d.sections,
         monitors: d.monitors.map(({ id, public: pub, label, section }) => ({ id, public: pub, label, section })),
       });
@@ -201,18 +200,6 @@ export function StatusPageEditor() {
                         onChange={(e) => set("website_url", e.target.value)}
                       />
                     </Field>
-                    <div className="flex flex-col gap-1.5">
-                      <Switch
-                        id="sp-uptimy-card"
-                        checked={!draft.hide_uptimy_card}
-                        onChange={(v) => set("hide_uptimy_card", !v)}
-                        label="Show the Uptimy card in the footer"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        A short card about Uptimy at the bottom of the page. Turned off, a small &ldquo;Powered by
-                        Uptimy&rdquo; line stays.
-                      </p>
-                    </div>
                   </CardContent>
                 </Card>
 

@@ -29,9 +29,6 @@ type Settings struct {
 	AccentColor string `json:"accent_color"`
 	// WebsiteURL adds a "Visit website" link to the header.
 	WebsiteURL string `json:"website_url"`
-	// HideUptimyCard drops the Uptimy card from the footer, as white-label
-	// does on hosted pages; the "Powered by Uptimy" line stays.
-	HideUptimyCard bool `json:"hide_uptimy_card"`
 	// Domain is a hostname, e.g. status.example.com, that serves only the
 	// status page: at "/", with no sign-in, API or metrics. Pointing it at the
 	// agent (DNS, TLS, an Ingress) is up to whoever runs it. Empty = none.
