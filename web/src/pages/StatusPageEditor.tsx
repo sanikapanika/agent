@@ -1,7 +1,20 @@
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, FileText, Globe, RotateCcw, RotateCw } from "lucide-react";
+import {
+  Award,
+  ExternalLink,
+  Eye,
+  FileText,
+  Globe,
+  Megaphone,
+  Palette,
+  Pencil,
+  RotateCcw,
+  RotateCw,
+  Settings2,
+} from "lucide-react";
+import { useSearchParams } from "react-router";
 import { CopyButton } from "@/components/ui/copy-button";
 import { api, type StatusPageConfig, type StatusPageLogos } from "@/lib/api";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -67,23 +80,56 @@ export function StatusPageEditor() {
   const publicURL = domain ? `https://${domain}` : "/status";
   const domainClash = !!draft && isDashboardHost(draft.domain);
 
+  const [params, setParams] = useSearchParams();
+  const tab = (TABS.find((t) => t.id === params.get("tab"))?.id ?? "editor") as TabID;
+  const setTab = (t: TabID) => setParams(t === "editor" ? {} : { tab: t }, { replace: true });
+  const pageURL = domain ? `https://${domain}/` : `${window.location.origin}/status`;
+
   return (
     <>
       <PageHeader
         title="Status page"
         icon={FileText}
-        description={`What visitors see at ${domain ?? "/status"}. Only names and uptime are shown, never hostnames or URLs.`}
+        description="What visitors see. Only names and uptime are shown, never hostnames or URLs."
         actions={
           <a href={publicURL} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "outline" })}>
-            Open <ExternalLink />
+            View <ExternalLink />
           </a>
         }
       />
       <ErrorNote error={config.error} />
       {draft && (
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div className="flex min-w-0 flex-col gap-6">
-            <AnnouncementEditor canEdit={canEdit} onChange={() => setPreviewKey((k) => k + 1)} />
+        <div className="flex flex-col gap-6">
+          <nav
+            aria-label="Status page settings"
+            className="flex gap-1 overflow-x-auto rounded-xl border bg-card p-1.5 shadow-xs sm:gap-2"
+          >
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                aria-current={tab === t.id ? "page" : undefined}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "flex shrink-0 items-center gap-2 rounded-lg border border-transparent px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors sm:px-4",
+                  tab === t.id
+                    ? "border-primary/40 bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <t.icon className="size-4" />
+                <span className={cn(tab !== t.id && "hidden sm:inline")}>{t.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          {!canEdit && (
+            <p className="rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+              You have read-only access. Ask an admin to change the status page.
+            </p>
+          )}
+
+          {(tab === "editor" || tab === "domain") && (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -91,121 +137,175 @@ export function StatusPageEditor() {
               }}
             >
               <fieldset disabled={!canEdit} className="flex flex-col gap-6">
-                {!canEdit && (
-                  <p className="rounded-md border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                    You have read-only access. Ask an admin to change the status page.
-                  </p>
+                {tab === "editor" ? (
+                  <>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Settings2 className="size-4" /> Page settings
+                        </CardTitle>
+                        <CardDescription>Whether the page is published, and what it shows.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex flex-col gap-5">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-sm font-medium">Page URL</span>
+                          <div className="flex items-center gap-2 rounded-md border bg-muted/50 py-1 pr-1 pl-3">
+                            <span className="min-w-0 flex-1 truncate font-mono text-sm">{pageURL}</span>
+                            <CopyButton text={pageURL} label="Copy URL" />
+                            <a
+                              href={publicURL}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={buttonVariants({ variant: "outline", size: "sm" })}
+                            >
+                              View
+                            </a>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {domain ? (
+                              "Its own domain. Change it under Custom domain."
+                            ) : (
+                              <>
+                                Give it its own address under{" "}
+                                <button type="button" className="underline" onClick={() => setTab("domain")}>
+                                  Custom domain
+                                </button>
+                                .
+                              </>
+                            )}
+                          </p>
+                        </div>
+                        <SettingRow
+                          title="Published"
+                          description={
+                            draft.enabled
+                              ? "Anyone with the link can see the page."
+                              : "Visitors get a “not found” page."
+                          }
+                        >
+                          <Switch
+                            id="sp-enabled"
+                            checked={draft.enabled}
+                            onChange={(v) => set("enabled", v)}
+                            label={<span className="sr-only">Published</span>}
+                          />
+                        </SettingRow>
+                        <SettingRow
+                          title="Recent events"
+                          description="List outages and recoveries at the bottom of the page."
+                        >
+                          <Switch
+                            id="sp-events"
+                            checked={draft.show_events}
+                            onChange={(v) => set("show_events", v)}
+                            label={<span className="sr-only">Recent events</span>}
+                          />
+                        </SettingRow>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Palette className="size-4" /> Branding
+                        </CardTitle>
+                        <CardDescription>The page&apos;s name, website link, logos and accent color.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+                        <div className="flex flex-col gap-5">
+                          <Field
+                            label="Page name"
+                            htmlFor="sp-title"
+                            hint="Shown when there's no logo, and as the browser tab title."
+                          >
+                            <Input
+                              id="sp-title"
+                              required
+                              maxLength={100}
+                              value={draft.title}
+                              onChange={(e) => set("title", e.target.value)}
+                            />
+                          </Field>
+                          <Field
+                            label="Website URL"
+                            htmlFor="sp-website"
+                            hint='Adds a "Visit website" link to the header.'
+                          >
+                            <Input
+                              id="sp-website"
+                              type="url"
+                              placeholder="https://example.com"
+                              maxLength={300}
+                              value={draft.website_url}
+                              onChange={(e) => set("website_url", e.target.value)}
+                            />
+                          </Field>
+                          <Field
+                            label="Description"
+                            htmlFor="sp-desc"
+                            hint="Optional. Shown under the name, e.g. who to contact during an outage."
+                          >
+                            <Textarea
+                              id="sp-desc"
+                              maxLength={500}
+                              rows={3}
+                              value={draft.description}
+                              onChange={(e) => set("description", e.target.value)}
+                            />
+                          </Field>
+                        </div>
+                        <div className="flex flex-col gap-5">
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <LogoField
+                              variant="light"
+                              label="Logo"
+                              hint="Replaces the name. PNG, SVG, JPEG or WebP, up to 512 KB."
+                              url={draft.logos.light}
+                              onChange={applyLogos}
+                              disabled={!canEdit}
+                            />
+                            <LogoField
+                              variant="dark"
+                              label="Logo for dark mode"
+                              hint="Optional. Otherwise the logo above is used."
+                              url={draft.logos.dark}
+                              onChange={applyLogos}
+                              disabled={!canEdit}
+                            />
+                          </div>
+                          <Field label="Accent color" htmlFor="sp-accent" hint="Used for section headings.">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                aria-label="Pick accent color"
+                                value={draft.accent_color || DEFAULT_ACCENT}
+                                onChange={(e) => set("accent_color", e.target.value)}
+                                className="h-9 w-12 shrink-0 cursor-pointer rounded-md border bg-card p-1"
+                              />
+                              <Input
+                                id="sp-accent"
+                                className="w-32 font-mono"
+                                placeholder={DEFAULT_ACCENT}
+                                maxLength={7}
+                                value={draft.accent_color}
+                                onChange={(e) => set("accent_color", e.target.value)}
+                              />
+                              {draft.accent_color && (
+                                <Button variant="ghost" size="sm" onClick={() => set("accent_color", "")}>
+                                  <RotateCcw /> Default
+                                </Button>
+                              )}
+                            </div>
+                          </Field>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <SectionsEditor draft={draft} onChange={edit} />
+                  </>
+                ) : (
+                  <DomainCard value={draft.domain} onChange={(v) => set("domain", v)} />
                 )}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Page</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-5">
-                    <Switch
-                      id="sp-enabled"
-                      checked={draft.enabled}
-                      onChange={(v) => set("enabled", v)}
-                      label="Publish the status page"
-                    />
-                    <Field
-                      label="Title"
-                      htmlFor="sp-title"
-                      hint="Shown when there's no logo, and as the browser tab title."
-                    >
-                      <Input
-                        id="sp-title"
-                        required
-                        maxLength={100}
-                        value={draft.title}
-                        onChange={(e) => set("title", e.target.value)}
-                      />
-                    </Field>
-                    <Field
-                      label="Description"
-                      htmlFor="sp-desc"
-                      hint="Optional. Shown under the title, e.g. who to contact during an outage."
-                    >
-                      <Textarea
-                        id="sp-desc"
-                        maxLength={500}
-                        rows={3}
-                        value={draft.description}
-                        onChange={(e) => set("description", e.target.value)}
-                      />
-                    </Field>
-                    <Switch
-                      id="sp-events"
-                      checked={draft.show_events}
-                      onChange={(v) => set("show_events", v)}
-                      label="Show recent events (outages and recoveries)"
-                    />
-                  </CardContent>
-                </Card>
-
-                <DomainCard value={draft.domain} onChange={(v) => set("domain", v)} />
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Branding</CardTitle>
-                    <CardDescription>Make the page look like yours.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-5">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <LogoField
-                        variant="light"
-                        label="Logo"
-                        hint="Replaces the title. PNG, SVG, JPEG or WebP, up to 512 KB."
-                        url={draft.logos.light}
-                        onChange={applyLogos}
-                        disabled={!canEdit}
-                      />
-                      <LogoField
-                        variant="dark"
-                        label="Logo for dark mode"
-                        hint="Optional. Otherwise the logo above is used."
-                        url={draft.logos.dark}
-                        onChange={applyLogos}
-                        disabled={!canEdit}
-                      />
-                    </div>
-                    <Field label="Accent color" htmlFor="sp-accent" hint="Used for section headings.">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          aria-label="Pick accent color"
-                          value={draft.accent_color || DEFAULT_ACCENT}
-                          onChange={(e) => set("accent_color", e.target.value)}
-                          className="h-9 w-12 shrink-0 cursor-pointer rounded-md border bg-card p-1"
-                        />
-                        <Input
-                          id="sp-accent"
-                          className="w-32 font-mono"
-                          placeholder={DEFAULT_ACCENT}
-                          maxLength={7}
-                          value={draft.accent_color}
-                          onChange={(e) => set("accent_color", e.target.value)}
-                        />
-                        {draft.accent_color && (
-                          <Button variant="ghost" size="sm" onClick={() => set("accent_color", "")}>
-                            <RotateCcw /> Default
-                          </Button>
-                        )}
-                      </div>
-                    </Field>
-                    <Field label="Website" htmlFor="sp-website" hint='Adds a "Visit website" link to the header.'>
-                      <Input
-                        id="sp-website"
-                        type="url"
-                        placeholder="https://example.com"
-                        maxLength={300}
-                        value={draft.website_url}
-                        onChange={(e) => set("website_url", e.target.value)}
-                      />
-                    </Field>
-                  </CardContent>
-                </Card>
-
-                <SectionsEditor draft={draft} onChange={edit} />
 
                 {canEdit && (
                   <div className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-lg border bg-card/95 px-4 py-3 shadow-sm backdrop-blur">
@@ -223,42 +323,86 @@ export function StatusPageEditor() {
                 )}
               </fieldset>
             </form>
-            {config.data?.enabled && (
-              <BadgesCard config={config.data} base={domain ? `https://${domain}` : window.location.origin} />
-            )}
-          </div>
+          )}
 
-          <Card className="overflow-hidden xl:sticky xl:top-20">
-            <div className="flex items-center justify-between border-b px-4 py-2.5">
-              <span className="text-sm font-medium">Preview</span>
-              <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                {dirty ? "Updates when you save" : "Live"}
-                <button
-                  type="button"
-                  aria-label="Reload preview"
-                  className="rounded p-1 hover:bg-muted hover:text-foreground"
-                  onClick={() => setPreviewKey((k) => k + 1)}
-                >
-                  <RotateCw className="size-3.5" />
-                </button>
-              </span>
-            </div>
-            {config.data?.enabled ? (
-              <iframe
-                key={previewKey}
-                src="/status?preview"
-                title="Status page preview"
-                className="h-[70vh] w-full bg-background"
-              />
+          {tab === "announcement" && (
+            <AnnouncementEditor canEdit={canEdit} onChange={() => setPreviewKey((k) => k + 1)} />
+          )}
+
+          {tab === "badges" &&
+            (config.data?.enabled ? (
+              <BadgesCard config={config.data} base={domain ? `https://${domain}` : window.location.origin} />
             ) : (
-              <p className="px-4 py-16 text-center text-sm text-muted-foreground">
-                The status page is turned off. Visitors to /status get a “not found” page.
-              </p>
-            )}
-          </Card>
+              <Card className="px-6 py-12 text-center text-sm text-muted-foreground">
+                Badges are served while the status page is published.
+              </Card>
+            ))}
+
+          {tab === "preview" && (
+            <Card className="overflow-hidden">
+              <div className="flex items-center justify-between border-b px-4 py-2.5">
+                <span className="text-sm font-medium">Preview</span>
+                <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {dirty ? "Shows the saved page; save to see your changes" : "Live"}
+                  <button
+                    type="button"
+                    aria-label="Reload preview"
+                    className="rounded p-1 hover:bg-muted hover:text-foreground"
+                    onClick={() => setPreviewKey((k) => k + 1)}
+                  >
+                    <RotateCw className="size-3.5" />
+                  </button>
+                </span>
+              </div>
+              {config.data?.enabled ? (
+                <iframe
+                  key={previewKey}
+                  src="/status?preview"
+                  title="Status page preview"
+                  className="h-[75vh] w-full bg-background"
+                />
+              ) : (
+                <p className="px-4 py-16 text-center text-sm text-muted-foreground">
+                  The status page isn&apos;t published. Visitors get a “not found” page.
+                </p>
+              )}
+            </Card>
+          )}
         </div>
       )}
     </>
+  );
+}
+
+type TabID = "editor" | "announcement" | "domain" | "badges" | "preview";
+
+/** The editor's tabs, in the hosted Uptimy app's order. */
+const TABS: { id: TabID; label: string; icon: typeof Pencil }[] = [
+  { id: "editor", label: "Editor", icon: Pencil },
+  { id: "announcement", label: "Announcement", icon: Megaphone },
+  { id: "domain", label: "Custom domain", icon: Globe },
+  { id: "badges", label: "Badges", icon: Award },
+  { id: "preview", label: "Preview", icon: Eye },
+];
+
+/** A setting with its explanation on the left and its control on the right. */
+function SettingRow({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg bg-muted/40 px-4 py-3">
+      <div className="min-w-0">
+        <div className="text-sm font-medium">{title}</div>
+        <div className="text-xs text-muted-foreground">{description}</div>
+      </div>
+      {children}
+    </div>
   );
 }
 
