@@ -2,7 +2,7 @@
 // status pages (upti.my-status) so every agent status page reads as Uptimy.
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, AlertTriangle, CheckCircle, ExternalLink, XCircle, Wrench } from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle, Clock, ExternalLink, XCircle, Wrench } from "lucide-react";
 import { api, type PublicMonitor, type PublicStatus, type Status, type PublicMaintenance } from "@/lib/api";
 import { cn, formatDateTime, timeAgo } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -137,18 +137,6 @@ export function StatusPage() {
                 <NoticeCard notice={n} />
               </div>
             ))}
-            {active.length > 0 && (
-              <section className="mt-8">
-                <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-                  Active incidents
-                </h2>
-                <div className="flex flex-col gap-4">
-                  {active.map((i) => (
-                    <IncidentCard key={i.created_at} incident={i} />
-                  ))}
-                </div>
-              </section>
-            )}
             {s.maintenance.map((n) => (
               <MaintenanceNotice key={`${n.title}-${n.starts_at}`} n={n} />
             ))}
@@ -175,12 +163,44 @@ export function StatusPage() {
               ))
             )}
 
+            {active.length > 0 && (
+              <Card className="mt-10 overflow-hidden border border-down/20">
+                <CardHeader className="border-b border-down/10 bg-down/5">
+                  <CardTitle className="flex items-center justify-between text-base font-semibold text-red-600 dark:text-red-400">
+                    <span className="flex items-center">
+                      <span className="mr-3 h-5 w-1 rounded-full bg-down" />
+                      <span className="relative mr-2.5 size-2.5">
+                        <span className="absolute inset-0 rounded-full bg-down" />
+                        <span className="absolute inset-0 animate-ping rounded-full bg-red-400 opacity-75 motion-reduce:hidden" />
+                      </span>
+                      Active Incidents
+                    </span>
+                    <CountBadge className="border-down/30 text-red-600 dark:text-red-400">{active.length}</CountBadge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 p-3 sm:p-5">
+                  {active.map((i) => (
+                    <IncidentCard key={`${i.created_at}-${i.title}`} incident={i} />
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             {past.length > 0 && (
-              <Card className="mt-8">
-                <SectionHeader title="Past incidents" />
-                <CardContent className="flex flex-col gap-4 p-3 sm:p-6">
+              <Card className={cn("overflow-hidden", active.length > 0 ? "mt-6" : "mt-10")}>
+                <CardHeader className="border-b bg-muted/50">
+                  <CardTitle className="flex items-center justify-between text-base font-semibold text-muted-foreground">
+                    <span className="flex items-center">
+                      <span className="mr-3 h-5 w-1 rounded-full bg-neutral-400 dark:bg-neutral-600" />
+                      <Clock className="mr-2 size-4" />
+                      Past Incidents
+                    </span>
+                    <CountBadge>{past.length}</CountBadge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 p-3 sm:space-y-4 sm:p-5">
                   {past.map((i) => (
-                    <IncidentCard key={i.created_at} incident={i} />
+                    <IncidentCard key={`${i.created_at}-${i.title}`} incident={i} />
                   ))}
                 </CardContent>
               </Card>
@@ -221,6 +241,19 @@ export function StatusPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function CountBadge({ className, children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums",
+        className,
+      )}
+    >
+      {children}
+    </span>
   );
 }
 

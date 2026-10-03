@@ -1,9 +1,19 @@
 // How posted incidents and notices look, on the status page and in the
 // dashboard. Colors and labels mirror the hosted Uptimy status pages.
-import type { ReactNode } from "react";
-import { AlertCircle, AlertTriangle, CheckCircle2, Eye, Megaphone } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Eye,
+  Megaphone,
+  MessageSquare,
+  Zap,
+} from "lucide-react";
 import type { IncidentSeverity, IncidentStatus, PublicIncident } from "@/lib/api";
-import { cn, formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime, timeAgo } from "@/lib/utils";
 
 export const statusTheme: Record<
   IncidentStatus,
@@ -127,62 +137,181 @@ export function Timeline({
   );
 }
 
-/** An incident on the public page. */
+/**
+ * An incident on the public page, as on the hosted Uptimy status pages: a
+ * summary that expands into the timeline. Open incidents start expanded.
+ */
 export function IncidentCard({ incident }: { incident: PublicIncident }) {
-  const status = (incident.status || "investigating") as IncidentStatus;
   const resolved = !!incident.resolved_at;
+  const [expanded, setExpanded] = useState(!resolved);
+  const status = (incident.status || "investigating") as IncidentStatus;
+  const theme = statusTheme[status];
+  const latest = incident.updates[0];
+  const count = incident.updates.length;
+  const duration = incidentDuration(incident.created_at, incident.resolved_at);
+  const when = formatDateTime(resolved ? incident.resolved_at! : incident.created_at);
+
   return (
-    <div className="relative overflow-hidden rounded-xl border bg-card">
-      <span className={cn("absolute inset-y-0 left-0 w-[3px]", statusTheme[status].rail)} />
-      <div className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="relative flex size-2.5 shrink-0">
-                {!resolved && (
-                  <span
-                    className={cn(
-                      "absolute inline-flex size-full animate-ping rounded-full opacity-60 motion-reduce:hidden",
-                      statusTheme[status].dot,
-                    )}
-                  />
-                )}
-                <span className={cn("relative inline-flex size-2.5 rounded-full", statusTheme[status].dot)} />
-              </span>
-              <StatusChip status={status} />
-              {incident.severity && <SeverityChip severity={incident.severity} />}
-            </div>
-            <h3 className="mt-2.5 leading-snug font-semibold">{incident.title}</h3>
-            {/* Phones: the duration goes under the title instead of beside it. */}
-            <p className="mt-1 text-xs text-muted-foreground sm:hidden">
-              <span className="font-semibold text-foreground tabular-nums">
-                {incidentDuration(incident.created_at, incident.resolved_at)}
-              </span>{" "}
-              ·{" "}
-              {resolved
-                ? `Resolved ${formatDateTime(incident.resolved_at!)}`
-                : `Since ${formatDateTime(incident.created_at)}`}
+    <div className="relative overflow-hidden rounded-xl border bg-card transition-shadow duration-200 hover:shadow-sm">
+      <span className={cn("absolute inset-y-0 left-0 w-[3px]", theme.rail)} />
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="relative flex w-full items-start justify-between gap-3 px-4 py-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:gap-4 sm:px-5 sm:py-5"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 pr-6 sm:pr-0">
+            <span className="relative flex size-2.5 shrink-0">
+              {!resolved && (
+                <span
+                  className={cn(
+                    "absolute inline-flex size-full animate-ping rounded-full opacity-60 motion-reduce:hidden",
+                    theme.dot,
+                  )}
+                />
+              )}
+              <span className={cn("relative inline-flex size-2.5 rounded-full", theme.dot)} />
+            </span>
+            <StatusChip status={status} />
+            {incident.severity && <SeverityChip severity={incident.severity} />}
+          </div>
+          <h3 className="mt-2.5 text-sm leading-snug font-semibold text-foreground sm:text-[15px]">{incident.title}</h3>
+          {/* Phones: duration and date here; wider screens have the right rail. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground sm:hidden">
+            <span className="font-semibold text-foreground tabular-nums">{duration}</span>
+            <span>·</span>
+            <span className="tabular-nums">{when}</span>
+          </div>
+          {latest && (
+            <p
+              className={cn(
+                "mt-2 text-[13px] leading-relaxed whitespace-pre-wrap text-muted-foreground",
+                !expanded && "line-clamp-2",
+              )}
+            >
+              {latest.message}
             </p>
-            {incident.monitors.length > 0 && (
-              <p className="mt-1 text-xs text-muted-foreground">Affects: {incident.monitors.join(", ")}</p>
-            )}
-          </div>
-          <div className="hidden shrink-0 text-right sm:block">
-            <div className="text-sm font-semibold tabular-nums sm:text-base">
-              {incidentDuration(incident.created_at, incident.resolved_at)}
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              {resolved
-                ? `Resolved ${formatDateTime(incident.resolved_at!)}`
-                : `Since ${formatDateTime(incident.created_at)}`}
-            </div>
-          </div>
+          )}
+          {!expanded && (
+            <p className="mt-2 hidden truncate text-xs text-muted-foreground sm:block">
+              {resolved ? `Resolved ${when} · Duration ${duration}` : `Started ${when} · ${duration} and counting`}
+              {` · ${count} ${count === 1 ? "update" : "updates"}`}
+            </p>
+          )}
+          {incident.monitors.length > 0 && (
+            <p className="mt-2 text-xs text-muted-foreground">Affects: {incident.monitors.join(", ")}</p>
+          )}
         </div>
-        <div className="mt-4 border-t pt-4">
-          <Timeline updates={incident.updates} />
+        <div className="hidden shrink-0 items-start gap-2.5 sm:flex sm:gap-3">
+          <div className="text-right">
+            <div className="text-sm font-semibold text-foreground tabular-nums sm:text-base">{duration}</div>
+            <div className="text-[11px] text-muted-foreground">{when}</div>
+          </div>
+          <ChevronDown
+            className={cn(
+              "mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+              expanded && "rotate-180",
+            )}
+          />
+        </div>
+        <ChevronDown
+          className={cn(
+            "absolute top-4 right-4 size-4 text-muted-foreground transition-transform duration-200 sm:hidden",
+            expanded && "rotate-180",
+          )}
+        />
+      </button>
+
+      {expanded && (
+        <div className="space-y-4 border-t border-border/70 px-4 pt-4 pb-4 sm:px-5 sm:pb-5">
+          <PublicTimeline incident={incident} />
+          {resolved && (
+            <div className="flex items-center justify-between rounded-lg border border-up/15 bg-up/[0.05] px-3 py-2.5">
+              <span className="flex items-center gap-2 text-[13px] font-medium text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="size-4" />
+                Resolved
+              </span>
+              <span className="text-xs text-emerald-600 tabular-nums dark:text-emerald-400">{when}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Oldest first, from when the incident started, like the hosted timeline. */
+function PublicTimeline({ incident }: { incident: PublicIncident }) {
+  const updates = [...incident.updates].reverse();
+  return (
+    <div>
+      <div className="mb-4 flex items-center gap-2">
+        <Clock className="size-3.5 text-muted-foreground" />
+        <h4 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Timeline</h4>
+      </div>
+      <div className="relative pl-8">
+        <div className="absolute top-3 bottom-3 left-[11px] w-px bg-border" />
+        <div className="space-y-6">
+          <div className="relative">
+            <div className="absolute top-0 -left-8 z-10 flex size-6 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10">
+              <Zap className="size-3 text-red-500" />
+            </div>
+            <div className="flex min-h-6 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
+              <span className="text-sm font-medium text-red-600 dark:text-red-400">Incident started</span>
+              <TimelineTime iso={incident.created_at} />
+            </div>
+          </div>
+          {updates.map((u, i) => {
+            const theme = u.status ? statusTheme[u.status] : null;
+            return (
+              <div key={i} className="relative">
+                <div
+                  className={cn(
+                    "absolute top-0 -left-8 z-10 flex size-6 items-center justify-center rounded-full border",
+                    u.status ? updateIcon[u.status] : "border-blue-500/30 bg-blue-500/10",
+                  )}
+                >
+                  <MessageSquare className={cn("size-3", theme ? theme.text : "text-blue-500")} />
+                </div>
+                <div className="min-h-6">
+                  <div className="mb-2 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
+                    <span
+                      className={cn("text-sm font-medium", theme ? theme.text : "text-blue-600 dark:text-blue-400")}
+                    >
+                      {theme ? theme.label : "Update"}
+                    </span>
+                    <TimelineTime iso={u.time} />
+                  </div>
+                  <div className="rounded-md border bg-muted/50 p-2.5">
+                    <p className="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground sm:text-sm">
+                      {u.message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
+  );
+}
+
+/** The circle behind each update's icon, in its status's color. */
+const updateIcon: Record<IncidentStatus, string> = {
+  investigating: "border-red-500/30 bg-red-500/10",
+  identified: "border-orange-500/30 bg-orange-500/10",
+  monitoring: "border-sky-500/30 bg-sky-500/10",
+  resolved: "border-emerald-500/30 bg-emerald-500/10",
+};
+
+function TimelineTime({ iso }: { iso: string }) {
+  return (
+    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+      {formatDateTime(iso)}
+      <span className="ml-1 opacity-60">({timeAgo(iso)})</span>
+    </span>
   );
 }
 
