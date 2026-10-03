@@ -40,7 +40,8 @@ func (s *Server) statusDomainOnly(next, ui http.Handler) http.Handler {
 			http.Redirect(w, r, "/", http.StatusMovedPermanently)
 		case p == "/healthz", p == "/api/status", strings.HasPrefix(p, "/api/status/logo/"),
 			strings.HasPrefix(p, "/ping/"), strings.HasPrefix(p, "/badge/"),
-			strings.HasPrefix(p, "/assets/"), strings.HasPrefix(p, "/brand/"), p == "/favicon.svg":
+			strings.HasPrefix(p, "/assets/"), strings.HasPrefix(p, "/brand/"),
+			p == "/favicon.svg", p == "/favicon.ico", p == "/apple-touch-icon.png":
 			next.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)

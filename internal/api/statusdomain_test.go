@@ -51,6 +51,11 @@ func TestStatusDomain(t *testing.T) {
 			t.Errorf("%s: %d", path, w.Code)
 		}
 	}
+	for _, path := range []string{"/favicon.ico", "/apple-touch-icon.png"} {
+		if w := get(domain, "GET", path); w.Code != 200 {
+			t.Errorf("%s: %d", path, w.Code)
+		}
+	}
 	if w := get(domain, "GET", "/assets/index.js"); w.Code != 200 {
 		t.Errorf("assets: %d", w.Code)
 	}
