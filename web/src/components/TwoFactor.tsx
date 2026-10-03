@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, KeyRound, ShieldCheck } from "lucide-react";
+import { Check, CheckCircle2, Copy, Download, KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { renderSVG } from "uqr";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/input";
-import { CopyButton, CopyField } from "@/components/ui/copy-button";
+import { CopyField } from "@/components/ui/copy-button";
 import { ErrorNote } from "@/components/Layout";
 import { toast } from "@/components/ui/toast";
 
@@ -109,76 +109,162 @@ export function TwoFactorCard() {
 /** Scan, confirm with a code, then save the recovery codes. */
 function SetupDialog({ secret, uri, onClose }: { secret: string; uri: string; onClose: () => void }) {
   const [code, setCode] = useState("");
-  const enable = useMutation({ mutationFn: () => api.enableTwoFactor(code) });
+  const [showKey, setShowKey] = useState(false);
+  const enable = useMutation({ mutationFn: (c: string) => api.enableTwoFactor(c) });
+  const complete = code.length === 6;
 
   if (enable.data) {
     return (
-      <Dialog title="Save your recovery codes" icon={KeyRound} onClose={onClose}>
-        <div className="flex flex-col gap-4 border-y p-6">
-          <RecoveryCodes codes={enable.data.recovery_codes} />
-          <p className="text-sm text-muted-foreground">
-            Two-factor sign-in is on, and your other devices were signed out.
-          </p>
-        </div>
-        <div className="flex gap-3 p-6 pt-4">
-          <Button className="flex-1" onClick={onClose}>
-            I&apos;ve saved them
-          </Button>
-        </div>
-      </Dialog>
+      <SaveCodesDialog
+        subtitle="Step 2 of 2"
+        codes={enable.data.recovery_codes}
+        intro={
+          <div className="flex items-start gap-3 rounded-lg border border-up/30 bg-up/10 p-3 text-sm">
+            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-up" />
+            <div>
+              <p className="font-medium">Two-factor sign-in is on</p>
+              <p className="text-muted-foreground">Your other devices were signed out.</p>
+            </div>
+          </div>
+        }
+        onClose={onClose}
+      />
     );
   }
   return (
-    <Dialog title="Set up two-factor sign-in" icon={ShieldCheck} onClose={onClose} busy={enable.isPending}>
+    <Dialog
+      title="Set up two-factor sign-in"
+      subtitle="Step 1 of 2"
+      icon={ShieldCheck}
+      onClose={onClose}
+      busy={enable.isPending}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          enable.mutate();
+          if (complete) enable.mutate(code);
         }}
       >
-        <div className="flex flex-col gap-4 border-y p-6">
-          <p className="text-sm text-muted-foreground">
-            1. Scan this with your authenticator app, or enter the key by hand.
-          </p>
-          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-            <div
-              className="size-40 shrink-0 rounded-lg bg-white p-2"
-              aria-label="QR code for your authenticator app"
-              role="img"
-              // uqr renders an SVG of the otpauth:// URI; dark on white, so it scans in dark mode too.
-              dangerouslySetInnerHTML={{ __html: renderSVG(uri, { border: 1 }) }}
-            />
-            <div className="w-full min-w-0">
-              <p className="mb-1 text-xs text-muted-foreground">Key</p>
-              <CopyField text={secret} label="Copy key">
-                {secret.match(/.{1,4}/g)?.join(" ")}
-              </CopyField>
+        <div className="flex flex-col gap-6 border-y p-6">
+          <section>
+            <StepHeading n={1} title="Scan the QR code">
+              With 1Password, Google Authenticator, Authy or any authenticator app.
+            </StepHeading>
+            <div className="mt-4 flex flex-col items-center gap-3">
+              <div
+                className="size-48 rounded-xl bg-white p-3 shadow-sm ring-1 ring-black/10"
+                aria-label="QR code for your authenticator app"
+                role="img"
+                // uqr renders an SVG of the otpauth:// URI; dark on white, so it scans in dark mode too.
+                dangerouslySetInnerHTML={{ __html: renderSVG(uri, { border: 0 }) }}
+              />
+              {showKey ? (
+                <div className="w-full">
+                  <CopyField text={secret} label="Copy key">
+                    <span className="tracking-wider">{secret.match(/.{1,4}/g)?.join(" ")}</span>
+                  </CopyField>
+                  <p className="mt-1.5 text-xs text-muted-foreground">Time-based, 6 digits, every 30 seconds.</p>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  onClick={() => setShowKey(true)}
+                >
+                  Can&apos;t scan it? Enter a key instead
+                </button>
+              )}
             </div>
-          </div>
-          <Field label="2. Enter the 6-digit code it shows" htmlFor="totp-code">
+          </section>
+
+          <section>
+            <StepHeading n={2} title="Enter the code it shows">
+              The app shows a new 6-digit code every 30 seconds.
+            </StepHeading>
             <Input
               id="totp-code"
+              aria-label="6-digit code"
               inputMode="numeric"
               autoComplete="one-time-code"
-              required
               autoFocus
-              placeholder="123456"
-              className="font-mono tracking-widest"
+              placeholder="000000"
+              maxLength={6}
+              className="mt-4 h-14 text-center font-mono text-2xl tracking-[0.5em] placeholder:text-muted-foreground/40"
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "").slice(0, 6);
+                setCode(digits);
+                if (enable.isError) enable.reset();
+                // Six digits is a whole code: try it straight away.
+                if (digits.length === 6 && !enable.isPending) enable.mutate(digits);
+              }}
             />
-          </Field>
-          <ErrorNote error={enable.error} />
+            <div className="mt-3">
+              <ErrorNote error={enable.error} />
+            </div>
+          </section>
         </div>
         <div className="flex gap-3 p-6 pt-4">
           <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={enable.isPending}>
             Cancel
           </Button>
-          <Button type="submit" className="flex-1" disabled={enable.isPending}>
+          <Button type="submit" className="flex-1" disabled={!complete || enable.isPending}>
+            {enable.isPending && <Loader2 className="animate-spin" />}
             Turn on
           </Button>
         </div>
       </form>
+    </Dialog>
+  );
+}
+
+function StepHeading({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3">
+      <span className="grid size-6 shrink-0 place-items-center rounded-full bg-brand/15 text-xs font-semibold text-brand">
+        {n}
+      </span>
+      <div>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="text-sm text-muted-foreground">{children}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Shows new recovery codes; Done unlocks once they're saved. */
+function SaveCodesDialog({
+  subtitle,
+  codes,
+  intro,
+  onClose,
+}: {
+  subtitle?: string;
+  codes: string[];
+  intro?: React.ReactNode;
+  onClose: () => void;
+}) {
+  const [saved, setSaved] = useState(false);
+  return (
+    <Dialog title="Save your recovery codes" subtitle={subtitle} icon={KeyRound} onClose={onClose}>
+      <div className="flex flex-col gap-4 border-y p-6">
+        {intro}
+        <RecoveryCodes codes={codes} />
+        <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 accent-primary"
+            checked={saved}
+            onChange={(e) => setSaved(e.target.checked)}
+          />
+          I&apos;ve saved these codes somewhere safe
+        </label>
+      </div>
+      <div className="flex gap-3 p-6 pt-4">
+        <Button className="flex-1" onClick={onClose} disabled={!saved}>
+          Done
+        </Button>
+      </div>
     </Dialog>
   );
 }
@@ -205,18 +291,7 @@ function PasswordDialog({
     },
   });
   if (mutation.data) {
-    return (
-      <Dialog title="Save your new recovery codes" icon={KeyRound} onClose={onClose}>
-        <div className="border-y p-6">
-          <RecoveryCodes codes={mutation.data.recovery_codes} />
-        </div>
-        <div className="flex gap-3 p-6 pt-4">
-          <Button className="flex-1" onClick={onClose}>
-            I&apos;ve saved them
-          </Button>
-        </div>
-      </Dialog>
-    );
+    return <SaveCodesDialog codes={mutation.data.recovery_codes} onClose={onClose} />;
   }
   return (
     <Dialog title={title} onClose={onClose} busy={mutation.isPending}>
@@ -257,6 +332,7 @@ function PasswordDialog({
 /** The codes, once: each signs in one time when the phone is gone. */
 function RecoveryCodes({ codes }: { codes: string[] }) {
   const text = codes.join("\n");
+  const [copied, setCopied] = useState(false);
   const download = () => {
     const url = URL.createObjectURL(new Blob([text + "\n"], { type: "text/plain" }));
     const a = Object.assign(document.createElement("a"), { href: url, download: "uptimy-agent-recovery-codes.txt" });
@@ -266,18 +342,35 @@ function RecoveryCodes({ codes }: { codes: string[] }) {
   return (
     <div>
       <p className="text-sm text-muted-foreground">
-        Each code signs you in once if you lose your phone. Keep them somewhere safe, like a password manager. They
-        won&apos;t be shown again.
+        If you lose your phone, each code signs you in once. Keep them in a password manager. They won&apos;t be shown
+        again.
       </p>
-      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1.5 rounded-lg border bg-muted/40 p-4 font-mono text-sm">
-        {codes.map((c) => (
-          <span key={c}>{c}</span>
+      <ol className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 rounded-lg border bg-muted/40 p-4 font-mono text-sm">
+        {codes.map((c, i) => (
+          <li key={c} className="flex gap-2">
+            <span className="w-5 text-right text-muted-foreground/60 tabular-nums">{i + 1}.</span>
+            <span>{c}</span>
+          </li>
         ))}
-      </div>
-      <div className="mt-3 flex items-center gap-2">
-        <CopyButton text={text} label="Copy recovery codes" />
+      </ol>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            navigator.clipboard.writeText(text).then(
+              () => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1500);
+              },
+              () => toast.error("Couldn't copy", "Select the codes and copy them instead."),
+            )
+          }
+        >
+          {copied ? <Check className="text-up" /> : <Copy />} {copied ? "Copied" : "Copy codes"}
+        </Button>
         <Button variant="outline" size="sm" onClick={download}>
-          <Download /> Download
+          <Download /> Download .txt
         </Button>
       </div>
     </div>
