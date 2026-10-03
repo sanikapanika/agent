@@ -210,11 +210,10 @@ var migrations = []string{
 		PRIMARY KEY (user_id, code_hash)
 	);`,
 
-	// 5: incidents and notices posted on the status page, with their
-	// timeline and the monitors they affect.
+	// 5: incidents posted on the status page, with their timeline and the
+	// monitors they affect.
 	`CREATE TABLE incidents (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		kind TEXT NOT NULL,
 		title TEXT NOT NULL,
 		severity TEXT NOT NULL DEFAULT '',
 		created_at INTEGER NOT NULL,

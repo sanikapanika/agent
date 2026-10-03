@@ -226,18 +226,16 @@ export type NotifierInput = Omit<Notifier, "id" | "created_at">;
 
 // ── Incidents ─────────────────────────────────────────────────────────────
 
-export type IncidentKind = "incident" | "notice";
 export type IncidentStatus = "investigating" | "identified" | "monitoring" | "resolved";
 export type IncidentSeverity = "low" | "medium" | "high" | "critical";
 
-/** An incident or notice posted on the status page (internal/incident). */
+/** An incident posted on the status page (internal/incident). */
 export interface Incident {
   id: number;
-  kind: IncidentKind;
   title: string;
-  severity: IncidentSeverity | "";
-  /** The latest update's; "" for a notice that's still shown. */
-  status: IncidentStatus | "";
+  severity: IncidentSeverity;
+  /** The latest update's. */
+  status: IncidentStatus;
   monitor_ids: number[];
   created_at: string;
   resolved_at: string | null;
@@ -246,16 +244,15 @@ export interface Incident {
 
 export interface IncidentUpdate {
   id: number;
-  status: IncidentStatus | "";
+  status: IncidentStatus;
   message: string;
   created_at: string;
 }
 
 export interface NewIncident {
-  kind: IncidentKind;
   title: string;
-  severity: IncidentSeverity | "";
-  status: IncidentStatus | "";
+  severity: IncidentSeverity;
+  status: IncidentStatus;
   message: string;
   monitor_ids: number[];
 }
@@ -433,7 +430,9 @@ export interface PublicStatus {
   overall: "operational" | "degraded" | "outage" | "maintenance";
   maintenance: PublicMaintenance[];
   sections: { name: string; monitors: PublicMonitor[] }[];
-  /** Posted incidents (open and recently resolved) and current notices. */
+  /** The page's announcement, while it's shown. */
+  announcement: Announcement | null;
+  /** Posted incidents, open and recently resolved. */
   incidents: PublicIncident[];
   /** Monitors going down and recovering. */
   events: { monitor: string; status: Status; time: string }[];
@@ -441,7 +440,6 @@ export interface PublicStatus {
 }
 
 export interface PublicIncident {
-  kind: IncidentKind;
   title: string;
   severity?: IncidentSeverity;
   status: IncidentStatus | "";
@@ -449,6 +447,15 @@ export interface PublicIncident {
   created_at: string;
   resolved_at?: string;
   updates: { status?: IncidentStatus; message: string; time: string }[]; // newest first
+}
+
+/** The status page's one announcement (statuspage.Announcement). */
+export interface Announcement {
+  title: string;
+  message: string;
+  posted_at: string;
+  updated_at: string;
+  show_until: string | null;
 }
 
 export interface StatusSection {
@@ -592,10 +599,10 @@ export const api = {
 
   incidents: () => request<Incident[]>("GET", "/api/incidents"),
   createIncident: (i: NewIncident) => request<Incident>("POST", "/api/incidents", i),
-  updateIncident: (id: number, i: { title: string; severity: IncidentSeverity | ""; monitor_ids: number[] }) =>
+  updateIncident: (id: number, i: { title: string; severity: IncidentSeverity; monitor_ids: number[] }) =>
     request<Incident>("PUT", `/api/incidents/${id}`, i),
   deleteIncident: (id: number) => request<void>("DELETE", `/api/incidents/${id}`),
-  addIncidentUpdate: (id: number, u: { status: IncidentStatus | ""; message: string }) =>
+  addIncidentUpdate: (id: number, u: { status: IncidentStatus; message: string }) =>
     request<Incident>("POST", `/api/incidents/${id}/updates`, u),
   editIncidentUpdate: (id: number, updateID: number, message: string) =>
     request<Incident>("PUT", `/api/incidents/${id}/updates/${updateID}`, { message }),
@@ -636,6 +643,10 @@ export const api = {
   finishUptimyConnect: (state: string, key: string) =>
     request<UptimyCheckIn>("POST", "/api/uptimy/connect/finish", { state, key }),
 
+  announcement: () => request<Announcement | null>("GET", "/api/status-page/announcement"),
+  saveAnnouncement: (a: { title: string; message: string; show_until: string | null }) =>
+    request<Announcement>("PUT", "/api/status-page/announcement", a),
+  removeAnnouncement: () => request<void>("DELETE", "/api/status-page/announcement"),
   statusPageConfig: () => request<StatusPageConfig>("GET", "/api/status-page"),
   saveStatusPageConfig: (
     c: StatusPageSettings & { monitors: { id: number; public: boolean; label: string; section: string }[] },

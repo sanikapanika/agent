@@ -12,7 +12,8 @@ import { MaintenanceCard } from "@/components/status-page/maintenance";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 import { ErrorNote } from "@/components/Layout";
-import { IncidentCard, NoticeCard } from "@/components/status-page/incidents";
+import { IncidentCard } from "@/components/status-page/incidents";
+import { AnnouncementCard } from "@/components/status-page/announcement";
 
 const brandText = "text-[#268256] dark:text-[#65bd91]"; // emerald-600 / 400 in the Uptimy ramp
 
@@ -83,9 +84,8 @@ export function StatusPage() {
   });
   const s = status.data;
   const title = s?.title;
-  const notices = s?.incidents.filter((i) => i.kind === "notice") ?? [];
-  const active = s?.incidents.filter((i) => i.kind === "incident" && !i.resolved_at) ?? [];
-  const past = s?.incidents.filter((i) => i.kind === "incident" && i.resolved_at) ?? [];
+  const active = s?.incidents.filter((i) => !i.resolved_at) ?? [];
+  const past = s?.incidents.filter((i) => i.resolved_at) ?? [];
   useEffect(() => {
     if (title) document.title = title;
   }, [title]);
@@ -133,11 +133,11 @@ export function StatusPage() {
               )}
             </div>
             <Banner overall={s.overall} />
-            {notices.map((n) => (
-              <div key={n.created_at} className="mt-4">
-                <NoticeCard notice={n} />
+            {s.announcement && (
+              <div className="mt-4">
+                <AnnouncementCard announcement={s.announcement} />
               </div>
-            ))}
+            )}
 
             {s.sections.length === 0 ? (
               <Card className="mt-8">

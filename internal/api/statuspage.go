@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/uptimy/agent/internal/monitor"
 	"github.com/uptimy/agent/internal/statuspage"
@@ -110,4 +111,58 @@ func (s *Server) saveStatusPageConfig(w http.ResponseWriter, r *http.Request) {
 	s.setStatusDomain(in.Domain)
 	s.monitorsChanged(0)
 	s.getStatusPageConfig(w, r)
+}
+
+// getAnnouncement returns the status page's announcement, or null.
+func (s *Server) getAnnouncement(w http.ResponseWriter, r *http.Request) {
+	a, err := s.Store.Announcement(r.Context())
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, a)
+}
+
+// putAnnouncement posts the announcement, or edits the one that's up.
+func (s *Server) putAnnouncement(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Title     string     `json:"title"`
+		Message   string     `json:"message"`
+		ShowUntil *time.Time `json:"show_until"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	a := &statuspage.Announcement{Title: in.Title, Message: in.Message, ShowUntil: in.ShowUntil, PostedAt: now, UpdatedAt: now}
+	if err := a.Normalize(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if a.ShowUntil != nil && !a.ShowUntil.After(now) {
+		writeError(w, http.StatusBadRequest, `"show until" is already past; choose a later time or none`)
+		return
+	}
+	cur, err := s.Store.Announcement(r.Context())
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	// Editing one that's still up keeps when it was posted.
+	if cur.ShownAt(now) {
+		a.PostedAt = cur.PostedAt
+	}
+	if err := s.Store.SetAnnouncement(r.Context(), a); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, a)
+}
+
+func (s *Server) deleteAnnouncement(w http.ResponseWriter, r *http.Request) {
+	if err := s.Store.SetAnnouncement(r.Context(), nil); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

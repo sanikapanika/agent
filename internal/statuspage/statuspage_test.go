@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/uptimy/agent/internal/monitor"
 )
@@ -89,5 +90,21 @@ func TestNewLogo(t *testing.T) {
 	}
 	if _, err := NewLogo(append(png, make([]byte, MaxLogoBytes)...)); !errors.Is(err, ErrLogoTooLarge) {
 		t.Fatalf("too large: %v", err)
+	}
+}
+
+func TestAnnouncementShownAt(t *testing.T) {
+	now := time.Now()
+	until := now.Add(time.Hour)
+	var none *Announcement
+	if none.ShownAt(now) {
+		t.Error("nil is shown")
+	}
+	a := &Announcement{Title: "x", ShowUntil: &until}
+	if !a.ShownAt(now) || a.ShownAt(until) {
+		t.Error("show until")
+	}
+	if !(&Announcement{Title: "x"}).ShownAt(now.Add(24 * 365 * time.Hour)) {
+		t.Error("without an end it stays")
 	}
 }

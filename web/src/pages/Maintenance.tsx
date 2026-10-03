@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Wrench } from "lucide-react";
 import { api, type MaintenanceInput, type MaintenanceWindow } from "@/lib/api";
-import { cn, formatDateTime, timeAgo } from "@/lib/utils";
+import { cn, formatDateTime, fromLocalInput, timeAgo, toLocalInput } from "@/lib/utils";
 import { confirm } from "@/components/ui/confirm";
 import { toast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -23,15 +23,6 @@ const durations = [
   { label: "4 hours", minutes: 240 },
   { label: "1 day", minutes: 1440 },
 ];
-
-/** An ISO time as a datetime-local value, in the viewer's time zone. */
-function toLocalInput(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-const fromLocalInput = (v: string) => new Date(v).toISOString();
 
 function blank(): MaintenanceInput {
   const start = new Date();

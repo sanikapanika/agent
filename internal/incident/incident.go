@@ -1,7 +1,6 @@
-// Package incident models what people post on the status page by hand:
-// incidents, with a timeline of updates from "investigating" to "resolved",
-// and notices, a message shown until it's ended. The statuses and
-// severities match the hosted Uptimy status pages.
+// Package incident models incidents people post on the status page by hand,
+// with a timeline of updates from "investigating" to "resolved". The
+// statuses and severities match the hosted Uptimy status pages.
 package incident
 
 import (
@@ -11,16 +10,7 @@ import (
 	"time"
 )
 
-// Kind is an incident or a notice.
-type Kind string
-
-const (
-	KindIncident Kind = "incident"
-	KindNotice   Kind = "notice"
-)
-
-// Status is where an incident is. A notice's updates have no status until
-// it's ended (Resolved).
+// Status is where an incident is.
 type Status string
 
 const (
@@ -30,7 +20,7 @@ const (
 	Resolved      Status = "resolved"
 )
 
-// Severity is how bad an incident is; notices have none.
+// Severity is how bad an incident is.
 type Severity string
 
 const (
@@ -40,10 +30,9 @@ const (
 	Critical Severity = "critical"
 )
 
-// Incident is an incident or a notice.
+// Incident is one incident and its timeline.
 type Incident struct {
 	ID       int64    `json:"id"`
-	Kind     Kind     `json:"kind"`
 	Title    string   `json:"title"`
 	Severity Severity `json:"severity"`
 	// Status is the latest update's.
@@ -64,7 +53,7 @@ type Update struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Open reports whether it's still shown as current.
+// Open reports whether it isn't resolved.
 func (i Incident) Open() bool { return i.ResolvedAt == nil }
 
 // Normalize validates the incident's own fields and cleans them up.
@@ -76,12 +65,8 @@ func (i *Incident) Normalize() error {
 	slices.Sort(i.MonitorIDs)
 	i.MonitorIDs = slices.Compact(i.MonitorIDs)
 	switch {
-	case i.Kind != KindIncident && i.Kind != KindNotice:
-		return errors.New("post an incident or a notice")
 	case i.Title == "" || len(i.Title) > 150:
-		return errors.New("give it a title of up to 150 characters")
-	case i.Kind == KindNotice:
-		i.Severity = ""
+		return errors.New("give the incident a title of up to 150 characters")
 	case !slices.Contains([]Severity{Low, Medium, High, Critical}, i.Severity):
 		return errors.New("choose a severity: low, medium, high or critical")
 	}
@@ -100,16 +85,14 @@ func NormalizeMessage(m string) (string, error) {
 	return m, nil
 }
 
-// NormalizeUpdate validates an update to an incident of kind k.
-func NormalizeUpdate(k Kind, u *Update) error {
+// NormalizeUpdate validates an update.
+func NormalizeUpdate(u *Update) error {
 	var err error
 	if u.Message, err = NormalizeMessage(u.Message); err != nil {
 		return err
 	}
 	switch {
-	case k == KindNotice && u.Status != "" && u.Status != Resolved:
-		return errors.New("a notice is either shown or ended")
-	case k == KindIncident && !slices.Contains([]Status{Investigating, Identified, Monitoring, Resolved}, u.Status):
+	case !slices.Contains([]Status{Investigating, Identified, Monitoring, Resolved}, u.Status):
 		return errors.New("choose a status: investigating, identified, monitoring or resolved")
 	}
 	return nil

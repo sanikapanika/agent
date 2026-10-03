@@ -131,6 +131,9 @@ func (s *Server) Handler(ui http.Handler) http.Handler {
 
 	auth("GET /api/status-page", s.getStatusPageConfig)
 	auth("PUT /api/status-page", s.saveStatusPageConfig)
+	auth("GET /api/status-page/announcement", s.getAnnouncement)
+	auth("PUT /api/status-page/announcement", s.putAnnouncement)
+	auth("DELETE /api/status-page/announcement", s.deleteAnnouncement)
 	auth("PUT /api/status-page/logo/{variant}", s.putStatusPageLogo)
 	auth("DELETE /api/status-page/logo/{variant}", s.deleteStatusPageLogo)
 

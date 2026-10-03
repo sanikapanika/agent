@@ -96,3 +96,12 @@ export function formatDuration(ms: number) {
   const h = Math.floor(m / 60);
   return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
 }
+
+/** An ISO time as a datetime-local value, in the viewer's time zone. */
+export function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export const fromLocalInput = (v: string) => new Date(v).toISOString();

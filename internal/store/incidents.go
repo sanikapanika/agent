@@ -12,7 +12,7 @@ import (
 // ErrLastUpdate is returned when deleting an incident's only update.
 var ErrLastUpdate = errors.New("an incident keeps at least one update; delete the incident instead")
 
-// ListIncidents returns open incidents and notices, and those resolved
+// ListIncidents returns open incidents, and those resolved
 // after since, newest first, with their updates.
 func (s *Store) ListIncidents(ctx context.Context, since time.Time) ([]incident.Incident, error) {
 	return s.queryIncidents(ctx, "WHERE resolved_at IS NULL OR resolved_at > ?", since.UnixMilli())
@@ -31,7 +31,7 @@ func (s *Store) GetIncident(ctx context.Context, id int64) (incident.Incident, e
 }
 
 func (s *Store) queryIncidents(ctx context.Context, where string, args ...any) ([]incident.Incident, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id, kind, title, severity, created_at, resolved_at FROM incidents "+where+" ORDER BY created_at DESC, id DESC", args...) //nolint:gosec // G202: where is a constant
+	rows, err := s.db.QueryContext(ctx, "SELECT id, title, severity, created_at, resolved_at FROM incidents "+where+" ORDER BY created_at DESC, id DESC", args...) //nolint:gosec // G202: where is a constant
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (s *Store) queryIncidents(ctx context.Context, where string, args ...any) (
 			created  int64
 			resolved sql.NullInt64
 		)
-		if err := rows.Scan(&in.ID, &in.Kind, &in.Title, &in.Severity, &created, &resolved); err != nil {
+		if err := rows.Scan(&in.ID, &in.Title, &in.Severity, &created, &resolved); err != nil {
 			return nil, err
 		}
 		in.CreatedAt, in.ResolvedAt = fromMillis(created), optTime(resolved)
@@ -109,8 +109,8 @@ func (s *Store) queryIncidents(ctx context.Context, where string, args ...any) (
 func (s *Store) CreateIncident(ctx context.Context, in incident.Incident, first incident.Update) (incident.Incident, error) {
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	err := s.inTx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, "INSERT INTO incidents (kind, title, severity, created_at) VALUES (?, ?, ?, ?)",
-			in.Kind, in.Title, in.Severity, now.UnixMilli())
+		res, err := tx.ExecContext(ctx, "INSERT INTO incidents (title, severity, created_at) VALUES (?, ?, ?)",
+			in.Title, in.Severity, now.UnixMilli())
 		if err != nil {
 			return err
 		}
@@ -159,7 +159,7 @@ func setIncidentMonitors(ctx context.Context, tx *sql.Tx, in incident.Incident) 
 }
 
 // AddIncidentUpdate adds to the timeline. A "resolved" update resolves the
-// incident (or ends the notice); any other reopens it.
+// incident; any other reopens it.
 func (s *Store) AddIncidentUpdate(ctx context.Context, id int64, u incident.Update) (incident.Incident, error) {
 	err := s.inTx(ctx, func(tx *sql.Tx) error {
 		return addIncidentUpdate(ctx, tx, id, u, time.Now().UTC().Truncate(time.Millisecond))

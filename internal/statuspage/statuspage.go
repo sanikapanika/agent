@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/uptimy/agent/internal/monitor"
 )
@@ -158,4 +159,37 @@ func Ordered(monitors []monitor.Monitor) []monitor.Monitor {
 		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
 	})
 	return out
+}
+
+// Announcement is the one message a page can show above everything else:
+// news like a migration or a new region. Incidents are separate.
+type Announcement struct {
+	Title     string    `json:"title"`
+	Message   string    `json:"message"`
+	PostedAt  time.Time `json:"posted_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	// ShowUntil takes it down by itself; nil shows it until it's removed.
+	ShowUntil *time.Time `json:"show_until"`
+}
+
+// Normalize validates the announcement and cleans it up.
+func (a *Announcement) Normalize() error {
+	a.Title = strings.TrimSpace(a.Title)
+	a.Message = strings.TrimSpace(a.Message)
+	switch {
+	case a.Title == "" || len(a.Title) > 150:
+		return errors.New("give the announcement a title of up to 150 characters")
+	case len(a.Message) > 2000:
+		return errors.New("keep the message under 2000 characters")
+	}
+	if a.ShowUntil != nil {
+		t := a.ShowUntil.UTC().Truncate(time.Second)
+		a.ShowUntil = &t
+	}
+	return nil
+}
+
+// ShownAt reports whether the announcement is on the page at t.
+func (a *Announcement) ShownAt(t time.Time) bool {
+	return a != nil && (a.ShowUntil == nil || t.Before(*a.ShowUntil))
 }

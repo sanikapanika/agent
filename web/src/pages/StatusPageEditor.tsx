@@ -11,6 +11,7 @@ import { toast } from "@/components/ui/toast";
 import { ErrorNote, PageHeader } from "@/components/Layout";
 import { useCanEdit } from "@/components/AuthGate";
 import { LogoField } from "@/components/status-page/LogoField";
+import { AnnouncementEditor } from "@/components/status-page/AnnouncementEditor";
 import { DEFAULT_ACCENT, SectionsEditor } from "@/components/status-page/SectionsEditor";
 
 type Draft = StatusPageConfig;
@@ -82,6 +83,7 @@ export function StatusPageEditor() {
       {draft && (
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <div className="flex min-w-0 flex-col gap-6">
+            <AnnouncementEditor canEdit={canEdit} onChange={() => setPreviewKey((k) => k + 1)} />
             <form
               onSubmit={(e) => {
                 e.preventDefault();

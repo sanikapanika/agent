@@ -3,6 +3,7 @@ package api
 import (
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/uptimy/agent/internal/monitor"
 	"github.com/uptimy/agent/internal/store"
@@ -17,10 +18,10 @@ func TestIncidents(t *testing.T) {
 	private := createPrivateTCP(t, st, "Internal", "db:1") // not on the page
 
 	for name, body := range map[string]map[string]any{
-		"no severity": {"kind": "incident", "title": "x", "status": "investigating", "message": "m"},
-		"no message":  {"kind": "incident", "title": "x", "severity": "low", "status": "investigating"},
-		"bad status":  {"kind": "incident", "title": "x", "severity": "low", "status": "fixed", "message": "m"},
-		"bad kind":    {"kind": "banner", "title": "x", "message": "m"},
+		"no severity": {"title": "x", "status": "investigating", "message": "m"},
+		"no message":  {"title": "x", "severity": "low", "status": "investigating"},
+		"bad status":  {"title": "x", "severity": "low", "status": "fixed", "message": "m"},
+		"no title":    {"severity": "low", "status": "investigating", "message": "m"},
 	} {
 		if code, _ := c.do("POST", "/api/incidents", body); code != 400 {
 			t.Errorf("%s: %d", name, code)
@@ -28,7 +29,7 @@ func TestIncidents(t *testing.T) {
 	}
 
 	code, inc := c.do("POST", "/api/incidents", map[string]any{
-		"kind": "incident", "title": " Slow checkout ", "severity": "medium", "status": "investigating",
+		"title": " Slow checkout ", "severity": "medium", "status": "investigating",
 		"message": "Payments are slow.", "monitor_ids": []int64{api.ID, private.ID},
 	})
 	if code != 201 || inc["title"] != "Slow checkout" || inc["status"] != "investigating" {
@@ -91,25 +92,8 @@ func TestIncidents(t *testing.T) {
 		t.Fatalf("deleted the only update: %d", code)
 	}
 
-	// A notice shows until it's ended, and doesn't change the overall status
-	// (the reopened critical incident's).
-	code, notice := c.do("POST", "/api/incidents", map[string]any{"kind": "notice", "title": "New region", "severity": "high", "message": "We now serve from Frankfurt."})
-	if code != 201 || notice["severity"] != "" {
-		t.Fatalf("notice: %d %v", code, notice)
-	}
-	nid := strconv.Itoa(int(notice["id"].(float64)))
-	if code, _ := c.do("POST", "/api/incidents/"+nid+"/updates", map[string]any{"status": "investigating", "message": "x"}); code != 400 {
-		t.Fatalf("notice took an incident status: %d", code)
-	}
-	if p := public(); len(p["incidents"].([]any)) != 2 || p["overall"] != "outage" {
-		t.Fatalf("with a notice: %v %v", len(p["incidents"].([]any)), p["overall"])
-	}
-	c.do("POST", "/api/incidents/"+nid+"/updates", map[string]any{"status": "resolved", "message": "Ended."})
-	if p := public(); len(p["incidents"].([]any)) != 1 {
-		t.Fatalf("ended notice still shown: %v", p["incidents"])
-	}
 	_, list := c.doList("GET", "/api/incidents")
-	if len(list) != 2 {
+	if len(list) != 1 {
 		t.Fatalf("list: %v", list)
 	}
 
@@ -133,4 +117,57 @@ func createPrivateTCP(t *testing.T, st *store.Store, name, target string) monito
 		t.Fatal(err)
 	}
 	return m
+}
+
+func TestAnnouncement(t *testing.T) {
+	c := newTestServer(t)
+	if code, _ := c.login("admin", adminPassword); code != 200 {
+		t.Fatal("login")
+	}
+	public := func() any {
+		t.Helper()
+		_, body := c.another().do("GET", "/api/status", nil)
+		return body["announcement"]
+	}
+	if a := public(); a != nil {
+		t.Fatalf("none yet: %v", a)
+	}
+	if code, _ := c.do("PUT", "/api/status-page/announcement", map[string]any{"title": " ", "message": "x"}); code != 400 {
+		t.Fatalf("no title: %d", code)
+	}
+	past := time.Now().Add(-time.Minute)
+	if code, _ := c.do("PUT", "/api/status-page/announcement", map[string]any{"title": "x", "show_until": past}); code != 400 {
+		t.Fatalf("show until in the past: %d", code)
+	}
+
+	code, a := c.do("PUT", "/api/status-page/announcement", map[string]any{"title": " Moving to Frankfurt ", "message": "Saturday, 02:00 UTC."})
+	if code != 200 || a["title"] != "Moving to Frankfurt" || a["posted_at"] == nil {
+		t.Fatalf("post: %d %v", code, a)
+	}
+	if p, ok := public().(map[string]any); !ok || p["message"] != "Saturday, 02:00 UTC." {
+		t.Fatalf("on the page: %v", p)
+	}
+
+	// Editing keeps when it was posted. Saving the page's settings doesn't touch it.
+	time.Sleep(1100 * time.Millisecond)
+	_, edited := c.do("PUT", "/api/status-page/announcement", map[string]any{"title": "Moving to Frankfurt", "message": "Now Sunday."})
+	if edited["posted_at"] != a["posted_at"] || edited["updated_at"] == a["updated_at"] {
+		t.Fatalf("edit: %v then %v", a, edited)
+	}
+	_, cfg := c.do("GET", "/api/status-page", nil)
+	delete(cfg, "logos")
+	cfg["monitors"] = []any{}
+	if code, _ := c.do("PUT", "/api/status-page", cfg); code != 200 {
+		t.Fatalf("save page: %d", code)
+	}
+	if p, ok := public().(map[string]any); !ok || p["message"] != "Now Sunday." {
+		t.Fatalf("after saving the page: %v", p)
+	}
+
+	if code, _ := c.do("DELETE", "/api/status-page/announcement", nil); code != 204 {
+		t.Fatalf("remove: %d", code)
+	}
+	if a := public(); a != nil {
+		t.Fatalf("still shown: %v", a)
+	}
 }

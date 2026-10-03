@@ -30,7 +30,7 @@ Because it runs next to your services, it can check things that external monitor
 - **Alerts:** email, Slack, Microsoft Teams, Discord, Telegram, ntfy, PagerDuty, webhooks, Uptimy (alerts become incidents there, which can run workflows), and 30+ more services through one [Shoutrrr](https://shoutrrr.nickfedor.com/latest/services/overview/) URL (Pushover, Gotify, Matrix, Google Chat, Mattermost, Opsgenie, Signal, ...), fired on down and on recovery, with a consecutive-failure threshold to avoid flapping. Each channel alerts for every monitor or only the ones you choose
 - **Maintenance windows:** planned work doesn't page anyone, and is announced on the status page. A monitor that's still down when the window ends alerts then
 - **Status page:** public, at `/status` or on its own domain (`status.example.com`), which serves only the status page so sign-in and the dashboard stay private. Admins set a logo (with an optional dark-mode version), accent color and website link, create sections and drag monitors into order with public names, with a live preview, much like the Uptimy app. New monitors stay off the page until you add them. It shows names with uptime (healthchecks) or on-time runs (heartbeats) only, never internal hostnames
-- **Incidents and notices:** tell visitors what's going on with an incident (severity, affected monitors, and a timeline from investigating to resolved) or a notice for news like a migration, posted under **Incidents**
+- **Incidents and an announcement:** tell visitors what's going on with an incident (severity, affected monitors, and a timeline from investigating to resolved), posted under **Incidents**, or with the status page's announcement for news like a migration
 - **Badges:** SVG badges for READMEs with the page's overall status, or a monitor's status or uptime over 24 hours, 7, 30 or 90 days; copy them from the status page editor
 - **GitOps-friendly:** define monitors in YAML (a file, a ConfigMap or an env var), or click them together in the UI. Script everything else with [API tokens](#api)
 - **Switching from Uptime Kuma:** import its monitors and notifications in a few clicks; see [below](#switching-from-uptime-kuma)
@@ -226,7 +226,9 @@ Schedule maintenance under **Maintenance** before deploys, upgrades or migration
 
 ### Incidents
 
-Under **Incidents**, report an incident when something's wrong that visitors should hear about: a title, a severity (low, medium, high or critical), the monitors it affects, and a first update. Post updates as it moves from investigating to identified, monitoring and resolved; the status page shows the whole timeline, and resolved incidents stay listed for 14 days. While one is open, the page's headline says "Some Issues Detected", or "Outage Detected" for a critical one. A **notice** is an announcement shown at the top of the page until you end it. Updates can be corrected later, and deleting a resolution reopens the incident. Posting doesn't alert anyone; monitors do that.
+Under **Incidents**, report an incident when something's wrong that visitors should hear about: a title, a severity (low, medium, high or critical), the monitors it affects, and a first update. Post updates as it moves from investigating to identified, monitoring and resolved; the status page shows the whole timeline, and resolved incidents stay listed for 14 days. While one is open, the page's headline says "Some Issues Detected", or "Outage Detected" for a critical one. Updates can be corrected later, and deleting a resolution reopens the incident. Posting doesn't alert anyone; monitors do that.
+
+For news that isn't an incident, like a migration or a new region, post the status page's **announcement** at the top of **Status page**: a title and a message shown under the page's status, until you remove it or until a time you choose. Editing it keeps when it was posted.
 
 ### Badges
 

@@ -22,6 +22,9 @@ const (
 	keyUptimyConnection  = "uptimy_connection"
 	keyInstallID         = "install_id"
 	keyStatusPageLogoFmt = "status_page_logo_" // + variant
+	// keyAnnouncement is apart from the page's settings so the editor's save
+	// never overwrites it.
+	keyAnnouncement = "status_page_announcement"
 )
 
 // execer is a *sql.DB or a *sql.Tx.
@@ -186,4 +189,22 @@ func (s *Store) InstallID(ctx context.Context) (string, error) {
 	_, _ = rand.Read(b) // never fails (crypto/rand panics instead)
 	id = "agent-" + base64.RawURLEncoding.EncodeToString(b)
 	return id, setSetting(ctx, s.db, keyInstallID, id)
+}
+
+// Announcement returns the status page's announcement, or nil.
+func (s *Store) Announcement(ctx context.Context) (*statuspage.Announcement, error) {
+	var a statuspage.Announcement
+	ok, err := s.getJSON(ctx, keyAnnouncement, &a)
+	if !ok || err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// SetAnnouncement stores the announcement; nil removes it.
+func (s *Store) SetAnnouncement(ctx context.Context, a *statuspage.Announcement) error {
+	if a == nil {
+		return deleteSetting(ctx, s.db, keyAnnouncement)
+	}
+	return setJSON(ctx, s.db, keyAnnouncement, a)
 }

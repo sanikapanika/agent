@@ -10,8 +10,8 @@ import (
 	"github.com/uptimy/agent/internal/store"
 )
 
-// incidentHistory is how long resolved incidents and ended notices stay
-// listed, in the UI and on the status page.
+// incidentHistory is how long resolved incidents stay listed, in the UI and
+// on the status page.
 const incidentHistory = 14 * 24 * time.Hour
 
 func (s *Server) listIncidents(w http.ResponseWriter, r *http.Request) {
@@ -23,10 +23,9 @@ func (s *Server) listIncidents(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// createIncident posts an incident or a notice with its first message.
+// createIncident posts an incident with its first update.
 func (s *Server) createIncident(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Kind       incident.Kind     `json:"kind"`
 		Title      string            `json:"title"`
 		Severity   incident.Severity `json:"severity"`
 		Status     incident.Status   `json:"status"`
@@ -36,13 +35,13 @@ func (s *Server) createIncident(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	inc := incident.Incident{Kind: in.Kind, Title: in.Title, Severity: in.Severity, MonitorIDs: in.MonitorIDs}
+	inc := incident.Incident{Title: in.Title, Severity: in.Severity, MonitorIDs: in.MonitorIDs}
 	first := incident.Update{Status: in.Status, Message: in.Message}
 	if err := inc.Normalize(); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := incident.NormalizeUpdate(inc.Kind, &first); err != nil {
+	if err := incident.NormalizeUpdate(&first); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -84,16 +83,11 @@ func (s *Server) addIncidentUpdate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	cur, err := s.Store.GetIncident(r.Context(), id)
-	if err != nil {
-		s.storeError(w, r, err)
-		return
-	}
 	var u incident.Update
 	if !decode(w, r, &u) {
 		return
 	}
-	if err := incident.NormalizeUpdate(cur.Kind, &u); err != nil {
+	if err := incident.NormalizeUpdate(&u); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}

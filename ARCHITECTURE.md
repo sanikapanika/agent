@@ -94,7 +94,8 @@ SQLite through `modernc.org/sqlite` (pure Go, so the binary builds without cgo),
 | History | `results`, `runs`, `events` | `monitor.Result`, `monitor.Run`, `monitor.Event` |
 | Alert routing | `notifiers.all_monitors` + `notifier_monitors` | `notify.Notifier` (`AllMonitors`, `MonitorIDs`) |
 | Maintenance windows | `maintenance` + `maintenance_monitors` | `maintenance.Window` |
-| Incidents and notices | `incidents` + `incident_updates` + `incident_monitors` | `incident.Incident` |
+| Incidents | `incidents` + `incident_updates` + `incident_monitors` | `incident.Incident` |
+| The status page's announcement | `settings` (JSON, apart from the page's settings) | `statuspage.Announcement` |
 | API tokens (hashed) | `api_tokens` | `store.APIToken` |
 | Status page settings and logos | `settings` (JSON) | `statuspage.Settings`, `statuspage.Logo` |
 | Which monitors the status page shows, and how | columns on `monitors`, written only by the status page editor | `monitor.Monitor` (`Public`, `Status*`) |

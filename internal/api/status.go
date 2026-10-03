@@ -64,10 +64,9 @@ type publicEvent struct {
 	Time    time.Time      `json:"time"`
 }
 
-// publicIncident is a posted incident or notice. Monitors are the public
-// names of the affected monitors on the page.
+// publicIncident is a posted incident. Monitors are the public names of
+// the affected monitors on the page.
 type publicIncident struct {
-	Kind       incident.Kind     `json:"kind"`
 	Title      string            `json:"title"`
 	Severity   incident.Severity `json:"severity,omitempty"`
 	Status     incident.Status   `json:"status"`
@@ -183,6 +182,14 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	published := publicIncidents(posted, names)
+	announcement, err := s.Store.Announcement(r.Context())
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	if !announcement.ShownAt(time.Now()) {
+		announcement = nil
+	}
 	notices, err := s.publicMaintenance(r.Context(), names)
 	if err != nil {
 		s.internalError(w, r, err)
@@ -199,6 +206,7 @@ func (s *Server) publicStatus(w http.ResponseWriter, r *http.Request) {
 		"overall":      overallStatus(anyDown, published, notices),
 		"maintenance":  notices,
 		"sections":     sections,
+		"announcement": announcement,
 		"incidents":    published,
 		"events":       shown,
 		"updated":      time.Now().UTC(),
@@ -214,7 +222,7 @@ func overallStatus(anyDown bool, incidents []publicIncident, maintenance []publi
 		overall = "outage"
 	}
 	for _, inc := range incidents {
-		if inc.Kind != incident.KindIncident || inc.ResolvedAt != nil {
+		if inc.ResolvedAt != nil {
 			continue
 		}
 		switch {
@@ -262,15 +270,12 @@ func (s *Server) pageOverall(ctx context.Context) (string, error) {
 }
 
 // publicIncidents is what the page shows of posted incidents: open and
-// recently resolved incidents, and notices that haven't ended.
+// recently resolved ones.
 func publicIncidents(posted []incident.Incident, names map[int64]string) []publicIncident {
 	out := []publicIncident{}
 	for _, in := range posted {
-		if in.Kind == incident.KindNotice && !in.Open() {
-			continue
-		}
 		p := publicIncident{
-			Kind: in.Kind, Title: in.Title, Severity: in.Severity, Status: in.Status,
+			Title: in.Title, Severity: in.Severity, Status: in.Status,
 			Monitors: []string{}, CreatedAt: in.CreatedAt, ResolvedAt: in.ResolvedAt, Updates: []publicUpdate{},
 		}
 		for _, id := range in.MonitorIDs {

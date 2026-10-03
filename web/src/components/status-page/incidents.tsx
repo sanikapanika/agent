@@ -1,17 +1,7 @@
 // How posted incidents and notices look, on the status page and in the
 // dashboard. Colors and labels mirror the hosted Uptimy status pages.
 import { useState, type ReactNode } from "react";
-import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  Eye,
-  Megaphone,
-  MessageSquare,
-  Zap,
-} from "lucide-react";
+import { AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, Clock, Eye, MessageSquare, Zap } from "lucide-react";
 import type { IncidentSeverity, IncidentStatus, PublicIncident } from "@/lib/api";
 import { cn, formatDateTime, timeAgo } from "@/lib/utils";
 
@@ -312,25 +302,5 @@ function TimelineTime({ iso }: { iso: string }) {
       {formatDateTime(iso)}
       <span className="ml-1 opacity-60">({timeAgo(iso)})</span>
     </span>
-  );
-}
-
-/** A notice on the public page: an announcement shown until it's ended. */
-export function NoticeCard({ notice }: { notice: PublicIncident }) {
-  const latest = notice.updates[0];
-  return (
-    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 sm:p-5">
-      <div className="flex gap-3">
-        <Megaphone className="mt-0.5 size-5 shrink-0 text-primary" />
-        <div className="min-w-0">
-          <h3 className="leading-snug font-semibold">{notice.title}</h3>
-          {latest && <p className="mt-1 text-sm whitespace-pre-line break-words">{latest.message}</p>}
-          <p className="mt-2 text-xs text-muted-foreground">
-            Posted {formatDateTime(notice.created_at)}
-            {notice.monitors.length > 0 && <> · About: {notice.monitors.join(", ")}</>}
-          </p>
-        </div>
-      </div>
-    </div>
   );
 }

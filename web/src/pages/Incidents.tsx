@@ -1,20 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Megaphone, Pencil, Plus, Siren, Trash2 } from "lucide-react";
-import {
-  api,
-  type Incident,
-  type IncidentKind,
-  type IncidentSeverity,
-  type IncidentStatus,
-  type NewIncident,
-} from "@/lib/api";
+import { Pencil, Plus, Siren, Trash2 } from "lucide-react";
+import { api, type Incident, type IncidentSeverity, type IncidentStatus, type NewIncident } from "@/lib/api";
 import { cn, formatDateTime } from "@/lib/utils";
 import { confirm } from "@/components/ui/confirm";
 import { toast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { ErrorNote, PageHeader } from "@/components/Layout";
 import { MonitorScope, useAllMonitors } from "@/components/MonitorPicker";
@@ -30,32 +22,31 @@ import {
   statusTheme,
 } from "@/components/status-page/incidents";
 
-// Incidents and notices are written by people, for the status page. Posting
-// one doesn't alert anyone; monitors do that.
+// Incidents are written by people, for the status page. Posting one doesn't
+// alert anyone; monitors do that. Announcements live with the status page.
 
 /** The status the next update most likely has; reopening starts over. */
-function suggestedStatus(i: Incident): IncidentStatus | "" {
-  if (i.kind === "notice") return "";
+function suggestedStatus(i: Incident): IncidentStatus {
   const next: Record<IncidentStatus, IncidentStatus> = {
     investigating: "identified",
     identified: "monitoring",
     monitoring: "resolved",
     resolved: "investigating",
   };
-  return next[(i.status || "investigating") as IncidentStatus];
+  return next[i.status];
 }
 
 const resolvedMessage = "This incident has been resolved.";
 
 export function IncidentsPage() {
   const incidents = useQuery({ queryKey: ["incidents"], queryFn: api.incidents });
-  const [posting, setPosting] = useState<IncidentKind | null>(null);
+  const [posting, setPosting] = useState(false);
   const canEdit = useCanEdit();
 
   const list = incidents.data ?? [];
   const groups = [
     { title: "Open", items: list.filter((i) => !i.resolved_at) },
-    { title: "Resolved or ended in the last 14 days", items: list.filter((i) => i.resolved_at) },
+    { title: "Resolved in the last 14 days", items: list.filter((i) => i.resolved_at) },
   ].filter((g) => g.items.length > 0);
 
   return (
@@ -63,24 +54,19 @@ export function IncidentsPage() {
       <PageHeader
         title="Incidents"
         icon={Siren}
-        description="Tell visitors what's going on. Incidents and notices appear on the status page; posting one doesn't alert anyone."
+        description="Tell visitors what's going on. Incidents appear on the status page; posting one doesn't alert anyone."
         actions={
           canEdit &&
-          posting == null && (
-            <>
-              <Button variant="outline" onClick={() => setPosting("notice")}>
-                <Megaphone /> Post a notice
-              </Button>
-              <Button onClick={() => setPosting("incident")}>
-                <Plus /> Report an incident
-              </Button>
-            </>
+          !posting && (
+            <Button onClick={() => setPosting(true)}>
+              <Plus /> Report an incident
+            </Button>
           )
         }
       />
       <ErrorNote error={incidents.error} />
       <div className="flex flex-col gap-6">
-        {posting && <NewIncidentForm key={posting} kind={posting} onDone={() => setPosting(null)} />}
+        {posting && <NewIncidentForm onDone={() => setPosting(false)} />}
         {groups.map((g) => (
           <section key={g.title} className="flex flex-col gap-3">
             <h2 className="text-sm font-medium text-muted-foreground">{g.title}</h2>
@@ -91,8 +77,8 @@ export function IncidentsPage() {
         ))}
         {incidents.isSuccess && list.length === 0 && !posting && (
           <Card className="px-6 py-12 text-center text-sm text-muted-foreground">
-            Nothing posted. Report an incident when something&apos;s wrong and visitors should know what you&apos;re
-            doing about it, or post a notice for news like a migration or a new region.
+            No incidents. Report one when something&apos;s wrong and visitors should know what you&apos;re doing about
+            it. For news like a migration or a new region, post an announcement on the status page.
           </Card>
         )}
       </div>
@@ -167,14 +153,12 @@ function AffectedMonitors({ ids, onChange }: { ids: number[]; onChange: (ids: nu
   );
 }
 
-function NewIncidentForm({ kind, onDone }: { kind: IncidentKind; onDone: () => void }) {
+function NewIncidentForm({ onDone }: { onDone: () => void }) {
   const qc = useQueryClient();
-  const notice = kind === "notice";
   const [form, setForm] = useState<NewIncident>({
-    kind,
     title: "",
-    severity: notice ? "" : "medium",
-    status: notice ? "" : "investigating",
+    severity: "medium",
+    status: "investigating",
     message: "",
     monitor_ids: [],
   });
@@ -183,7 +167,7 @@ function NewIncidentForm({ kind, onDone }: { kind: IncidentKind; onDone: () => v
     mutationFn: () => api.createIncident(form),
     onSuccess: (i) => {
       qc.invalidateQueries({ queryKey: ["incidents"] });
-      toast.success(notice ? "Notice posted" : "Incident reported", i.title);
+      toast.success("Incident reported", i.title);
       onDone();
     },
   });
@@ -191,11 +175,9 @@ function NewIncidentForm({ kind, onDone }: { kind: IncidentKind; onDone: () => v
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{notice ? "Post a notice" : "Report an incident"}</CardTitle>
+        <CardTitle>Report an incident</CardTitle>
         <CardDescription>
-          {notice
-            ? "An announcement at the top of the status page, shown until you end it."
-            : "Shown on the status page right away. Post updates as you learn more, and resolve it when it's over."}
+          Shown on the status page right away. Post updates as you learn more, and resolve it when it&apos;s over.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -212,32 +194,30 @@ function NewIncidentForm({ kind, onDone }: { kind: IncidentKind; onDone: () => v
               required
               maxLength={150}
               value={form.title}
-              placeholder={notice ? "We're moving to a new data center" : "Checkout is failing for some customers"}
+              placeholder="Checkout is failing for some customers"
               onChange={(e) => set("title", e.target.value)}
             />
           </Field>
-          {!notice && (
-            <div className="flex flex-wrap gap-x-8 gap-y-5">
-              <Choice
-                label="Severity"
-                value={form.severity as IncidentSeverity}
-                options={SEVERITIES}
-                onChange={(v) => set("severity", v)}
-                render={severityOption}
-              />
-              <Choice
-                label="Status"
-                value={form.status as IncidentStatus}
-                options={STATUSES.filter((s) => s !== "resolved")}
-                onChange={(v) => set("status", v)}
-                render={statusOption}
-              />
-            </div>
-          )}
+          <div className="flex flex-wrap gap-x-8 gap-y-5">
+            <Choice
+              label="Severity"
+              value={form.severity}
+              options={SEVERITIES}
+              onChange={(v) => set("severity", v)}
+              render={severityOption}
+            />
+            <Choice
+              label="Status"
+              value={form.status}
+              options={STATUSES.filter((s) => s !== "resolved")}
+              onChange={(v) => set("status", v)}
+              render={statusOption}
+            />
+          </div>
           <Field
             label="Message"
             htmlFor="i-message"
-            hint={notice ? undefined : "What's happening and what you're doing about it. Visitors see it as written."}
+            hint="What's happening and what you're doing about it. Visitors see it as written."
           >
             <Textarea
               id="i-message"
@@ -245,11 +225,7 @@ function NewIncidentForm({ kind, onDone }: { kind: IncidentKind; onDone: () => v
               rows={4}
               maxLength={5000}
               value={form.message}
-              placeholder={
-                notice
-                  ? "On Saturday we're moving to a new data center. Expect a few minutes of downtime around 02:00 UTC."
-                  : "We're seeing failed payments and are looking into it."
-              }
+              placeholder="We're seeing failed payments and are looking into it."
               onChange={(e) => set("message", e.target.value)}
             />
           </Field>
@@ -260,7 +236,7 @@ function NewIncidentForm({ kind, onDone }: { kind: IncidentKind; onDone: () => v
               Cancel
             </Button>
             <Button type="submit" disabled={save.isPending}>
-              {notice ? "Post notice" : "Report incident"}
+              Report incident
             </Button>
           </div>
         </form>
@@ -274,7 +250,6 @@ function IncidentRow({ incident: inc }: { incident: Incident }) {
   const canEdit = useCanEdit();
   const { monitors } = useAllMonitors();
   const [editing, setEditing] = useState(false);
-  const notice = inc.kind === "notice";
   const open = !inc.resolved_at;
   const saved = (i: Incident) =>
     qc.setQueryData<Incident[]>(["incidents"], (l) => l?.map((x) => (x.id === i.id ? i : x)));
@@ -283,16 +258,8 @@ function IncidentRow({ incident: inc }: { incident: Incident }) {
     mutationFn: () => api.deleteIncident(inc.id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["incidents"] });
-      toast.success(notice ? "Notice deleted" : "Incident deleted", inc.title);
+      toast.success("Incident deleted", inc.title);
     },
-  });
-  const end = useMutation({
-    mutationFn: () => api.addIncidentUpdate(inc.id, { status: "resolved", message: "Ended." }),
-    onSuccess: (i) => {
-      saved(i);
-      toast.success("Notice ended", "It's no longer on the status page.");
-    },
-    onError: (err) => toast.error("Couldn't end the notice", err.message),
   });
   const removeUpdate = useMutation({
     mutationFn: (updateID: number) => api.deleteIncidentUpdate(inc.id, updateID),
@@ -302,40 +269,27 @@ function IncidentRow({ incident: inc }: { incident: Incident }) {
   const [editingUpdate, setEditingUpdate] = useState<number | null>(null);
 
   const names = inc.monitor_ids.map((id) => monitors.find((m) => m.id === id)?.name).filter(Boolean);
-  const status = (inc.status || "investigating") as IncidentStatus;
+  const status = inc.status;
 
   return (
     <Card className="relative overflow-hidden">
-      {!notice && <span className={cn("absolute inset-y-0 left-0 w-[3px]", statusTheme[status].rail)} />}
+      <span className={cn("absolute inset-y-0 left-0 w-[3px]", statusTheme[status].rail)} />
       <div className="p-5">
         <div className="flex flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              {notice ? (
-                <Badge className="gap-1 bg-primary/10 text-primary">
-                  <Megaphone className="size-3" /> Notice{open ? "" : " · ended"}
-                </Badge>
-              ) : (
-                <>
-                  <StatusChip status={status} />
-                  {inc.severity && <SeverityChip severity={inc.severity} />}
-                </>
-              )}
+              <StatusChip status={status} />
+              <SeverityChip severity={inc.severity} />
             </div>
             <h3 className="mt-2 font-medium">{inc.title}</h3>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {formatDateTime(inc.created_at)}
-              {!notice && ` · ${incidentDuration(inc.created_at, inc.resolved_at)}${open ? " so far" : ""}`}
+              {` · ${incidentDuration(inc.created_at, inc.resolved_at)}${open ? " so far" : ""}`}
               {names.length > 0 && ` · ${names.join(", ")}`}
             </p>
           </div>
           {canEdit && !editing && (
             <div className="flex gap-2">
-              {notice && open && (
-                <Button variant="outline" size="sm" onClick={() => end.mutate()} disabled={end.isPending}>
-                  End notice
-                </Button>
-              )}
               <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
                 Edit
               </Button>
@@ -344,11 +298,11 @@ function IncidentRow({ incident: inc }: { incident: Incident }) {
                 size="sm"
                 onClick={() =>
                   confirm({
-                    title: notice ? "Delete notice" : "Delete incident",
+                    title: "Delete incident",
                     message: (
                       <>
                         <strong className="text-foreground">{inc.title}</strong> and its updates will be removed from
-                        the status page. To show it's over instead, {notice ? "end the notice" : "resolve it"}.
+                        the status page. To show it's over instead, resolve it.
                       </>
                     ),
                     confirmLabel: "Delete",
@@ -367,7 +321,7 @@ function IncidentRow({ incident: inc }: { incident: Incident }) {
         <div className="mt-4 border-t pt-4">
           <Timeline
             updates={inc.updates.map((u) => ({
-              status: notice ? undefined : u.status,
+              status: u.status,
               message: u.message,
               time: u.created_at,
             }))}
@@ -415,8 +369,8 @@ function IncidentRow({ incident: inc }: { incident: Incident }) {
           )}
         </div>
 
-        {canEdit && open && !notice && <AddUpdateForm key={inc.status} incident={inc} onSaved={saved} />}
-        {canEdit && !open && !notice && <ReopenSection incident={inc} onSaved={saved} />}
+        {canEdit && open && <AddUpdateForm key={inc.status} incident={inc} onSaved={saved} />}
+        {canEdit && !open && <ReopenSection incident={inc} onSaved={saved} />}
       </div>
     </Card>
   );
@@ -588,15 +542,7 @@ function EditIncidentForm({
       <Field label="Title" htmlFor={`t-${inc.id}`}>
         <Input id={`t-${inc.id}`} required maxLength={150} value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
-      {inc.kind === "incident" && (
-        <Choice
-          label="Severity"
-          value={severity as IncidentSeverity}
-          options={SEVERITIES}
-          onChange={setSeverity}
-          render={severityOption}
-        />
-      )}
+      <Choice label="Severity" value={severity} options={SEVERITIES} onChange={setSeverity} render={severityOption} />
       <AffectedMonitors ids={ids} onChange={setIds} />
       <ErrorNote error={save.error} />
       <div className="flex justify-end gap-2">
