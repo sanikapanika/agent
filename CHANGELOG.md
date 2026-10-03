@@ -4,6 +4,8 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-10-03
+
 ### Added
 - **Incidents** on the status page, under the new **Incidents** page: an incident has a severity, the monitors it affects and a timeline of updates from investigating to resolved, and stays listed for 14 days once resolved. An open incident turns the page's headline to "Some Issues Detected" ("Outage Detected" when critical).
 - **An announcement** on the status page: one message under its status, for news like a migration or a new region, posted from the status page editor and shown until you remove it or until a time you choose.
@@ -14,6 +16,7 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 - The status page editor is laid out like the hosted Uptimy app's: tabs for Editor, Announcement, Custom domain, Badges and a live Preview, with page settings, branding and sections full width in the Editor tab.
 - The status page looks like the hosted Uptimy pages: incidents in Active and Past Incidents sections with cards that expand into a timeline, maintenance in a Scheduled Maintenance section (in progress with a progress bar, upcoming, and completed in the last week), and "30 days ago … Today" under the daily bars.
 - The public status API lists monitors going down and recovering under `events`; `incidents` now holds posted incidents, and `announcement` the page's announcement.
+- The favicon is also served as `favicon.ico` and an Apple touch icon, so Safari shows it.
 - Two-factor setup: numbered steps, a framed QR code with the key behind "Can't scan it?", a code field that submits itself, and recovery codes you confirm you've saved before closing.
 
 ## [0.1.5] - 2026-10-03
@@ -87,7 +90,8 @@ First public release.
 - API tokens (full or read-only) for scripts and CI.
 - Import monitors and notifications from Uptime Kuma (`kuma.db`), with a review step.
 
-[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/uptimy/agent/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/uptimy/agent/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/uptimy/agent/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/uptimy/agent/compare/v0.1.2...v0.1.3
