@@ -54,7 +54,7 @@ const banners: Record<
     tint: "bg-degraded/5",
     titleColor: "text-orange-600 dark:text-orange-400",
     title: "Some Issues Detected",
-    subtitle: "Some systems are experiencing issues",
+    subtitle: "Some services are experiencing issues",
   },
   outage: {
     icon: XCircle,
