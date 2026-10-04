@@ -34,7 +34,7 @@ Because it runs next to your services, it can check things that external monitor
 - **Badges:** SVG badges for READMEs with the page's overall status, or a monitor's status or uptime over 24 hours, 7, 30 or 90 days; copy them from the status page editor
 - **GitOps-friendly:** define monitors in YAML (a file, a ConfigMap or an env var), or click them together in the UI. Script everything else with [API tokens](#api)
 - **Switching from Uptime Kuma:** import its monitors and notifications in a few clicks; see [below](#switching-from-uptime-kuma)
-- **Light:** one static Go binary with an embedded SQLite database (pure Go, no CGO) in a distroless image: a 9 MB download. It uses 8 MiB of memory idle and 24 MiB with 350 monitors, a fraction of Uptime Kuma's 130–160 MiB ([benchmark](bench/uptime-kuma/README.md))
+- **Light:** one static Go binary with an embedded SQLite database (pure Go, no CGO) in a distroless image: a 9 MB download. It uses 8 MiB of memory idle and 25 MiB with 350 monitors, a fraction of Uptime Kuma's 125–160 MiB ([benchmark](bench/uptime-kuma/README.md))
 
 ## Quick start
 
