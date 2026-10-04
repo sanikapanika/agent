@@ -4,6 +4,8 @@ Notable changes to Uptimy Agent. The format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-10-04
+
 ### Added
 - The Uptime Kuma importer carries over Pushover, Gotify, Matrix, Mattermost, Google Chat, Rocket.Chat and Opsgenie notifications as "More services (Shoutrrr)" channels, and Kuma's status page groups as sections, in Kuma's order. Tested on a database from Uptime Kuma 2.5.5.
 
@@ -93,7 +95,8 @@ First public release.
 - API tokens (full or read-only) for scripts and CI.
 - Import monitors and notifications from Uptime Kuma (`kuma.db`), with a review step.
 
-[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/uptimy/agent/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/uptimy/agent/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/uptimy/agent/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/uptimy/agent/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/uptimy/agent/compare/v0.1.3...v0.1.4
