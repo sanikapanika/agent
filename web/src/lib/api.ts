@@ -288,6 +288,8 @@ export interface APIToken {
 
 /** What an Uptime Kuma database would become (internal/kuma.Plan). */
 export interface KumaPlan {
+  /** Kuma's status page groups, which become sections. */
+  sections: StatusSection[];
   monitors: { kuma_id: number; monitor: Monitor; notes: string[] | null }[];
   notifiers: { kuma_id: number; notifier: Notifier; kuma_monitor_ids: number[] | null; notes: string[] | null }[];
   skipped: KumaSkipped[];
@@ -617,7 +619,7 @@ export const api = {
   deleteMaintenance: (id: number) => request<void>("DELETE", `/api/maintenance/${id}`),
 
   planKumaImport: (file: File) => upload<KumaPlan>("/api/import/kuma", file),
-  applyKumaImport: (plan: Pick<KumaPlan, "monitors" | "notifiers">) =>
+  applyKumaImport: (plan: Pick<KumaPlan, "sections" | "monitors" | "notifiers">) =>
     request<KumaImportResult>("POST", "/api/import/kuma/apply", plan),
   activity: () => request<ActivityItem[]>("GET", "/api/activity"),
 

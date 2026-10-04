@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -213,6 +214,13 @@ func convertNotification(cfg row) (n notify.Notifier, notes []string, reason str
 		}
 	case "PagerDuty":
 		n.Type, n.Config.RoutingKey = "pagerduty", cfg.str("pagerdutyIntegrationKey")
+	case "pushover", "gotify", "matrix", "mattermost", "GoogleChat", "rocket.chat", "Opsgenie":
+		u, reason := shoutrrrURL(typ, cfg)
+		if reason != "" {
+			return n, nil, reason
+		}
+		n.Type, n.Config.URL = "shoutrrr", u
+		notes = append(notes, "sends through Shoutrrr (the \"More services\" channel)")
 	default:
 		return n, nil, fmt.Sprintf("%s notifications aren't supported yet", typ)
 	}
@@ -220,4 +228,103 @@ func convertNotification(cfg row) (n notify.Notifier, notes []string, reason str
 		return n, nil, "its ntfy server URL isn't valid"
 	}
 	return n, notes, ""
+}
+
+// shoutrrrURL builds the Shoutrrr URL for a Kuma notification the agent sends
+// through its "More services (Shoutrrr)" channel. Formats:
+// https://shoutrrr.nickfedor.com/latest/services/overview/
+func shoutrrrURL(typ string, cfg row) (string, string) {
+	esc := url.PathEscape
+	switch typ {
+	case "pushover":
+		q := url.Values{}
+		if d := cfg.str("pushoverdevice"); d != "" {
+			q.Set("devices", d)
+		}
+		if p := cfg.str("pushoverpriority"); p != "" {
+			q.Set("priority", p)
+		}
+		return withQuery("pushover://shoutrrr:"+esc(cfg.str("pushoverapptoken"))+"@"+esc(cfg.str("pushoveruserkey"))+"/", q), ""
+	case "gotify":
+		server, err := url.Parse(cfg.str("gotifyserverurl"))
+		if err != nil || server.Host == "" {
+			return "", "its Gotify server URL isn't valid"
+		}
+		q := url.Values{}
+		if server.Scheme == "http" {
+			q.Set("disabletls", "yes")
+		}
+		if p := cfg.str("gotifyPriority"); p != "" {
+			q.Set("priority", p)
+		}
+		return withQuery("gotify://"+server.Host+strings.TrimSuffix(server.Path, "/")+"/"+esc(cfg.str("gotifyapplicationToken")), q), ""
+	case "matrix":
+		server, err := url.Parse(cfg.str("homeserverUrl"))
+		if err != nil || server.Host == "" {
+			return "", "its Matrix homeserver URL isn't valid"
+		}
+		// No user: Shoutrrr uses the password as an access token.
+		q := url.Values{"rooms": {cfg.str("internalRoomId")}}
+		if server.Scheme == "http" {
+			q.Set("disableTLS", "yes")
+		}
+		return withQuery("matrix://:"+esc(cfg.str("accessToken"))+"@"+server.Host+"/", q), ""
+	case "mattermost":
+		hook, err := url.Parse(cfg.str("mattermostWebhookUrl"))
+		path, ok := strings.CutPrefix(hookPath(hook), "/hooks/")
+		if err != nil || hook.Host == "" || !ok {
+			return "", "its Mattermost webhook URL isn't valid"
+		}
+		user := ""
+		if u := cfg.str("mattermostusername"); u != "" {
+			user = esc(u) + "@"
+		}
+		u := "mattermost://" + user + hook.Host + "/" + path
+		if c := strings.TrimPrefix(cfg.str("mattermostchannel"), "#"); c != "" {
+			u += "/" + esc(c)
+		}
+		return u, ""
+	case "GoogleChat":
+		hook, err := url.Parse(cfg.str("googleChatWebhookURL"))
+		if err != nil || hook.Host == "" {
+			return "", "its Google Chat webhook URL isn't valid"
+		}
+		return "googlechat://" + hook.Host + hook.Path + "?" + hook.RawQuery, ""
+	case "rocket.chat":
+		hook, err := url.Parse(cfg.str("rocketwebhookURL"))
+		path, ok := strings.CutPrefix(hookPath(hook), "/hooks/")
+		if err != nil || hook.Host == "" || !ok {
+			return "", "its Rocket.Chat webhook URL isn't valid"
+		}
+		user := ""
+		if u := cfg.str("rocketusername"); u != "" {
+			user = esc(u) + "@"
+		}
+		u := "rocketchat://" + user + hook.Host + "/" + path
+		if c := cfg.str("rocketchannel"); c != "" {
+			u += "/" + esc(c)
+		}
+		return u, ""
+	case "Opsgenie":
+		host := "api.opsgenie.com"
+		if strings.EqualFold(cfg.str("opsgenieRegion"), "eu") {
+			host = "api.eu.opsgenie.com"
+		}
+		return "opsgenie://" + host + "/" + esc(cfg.str("opsgenieApiKey")), ""
+	}
+	return "", typ + " notifications aren't supported yet"
+}
+
+func hookPath(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	return u.Path
+}
+
+func withQuery(u string, q url.Values) string {
+	if len(q) == 0 {
+		return u
+	}
+	return u + "?" + q.Encode()
 }

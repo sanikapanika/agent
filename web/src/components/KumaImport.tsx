@@ -100,6 +100,7 @@ function PlanReview({
   const apply = useMutation({
     mutationFn: () =>
       api.applyKumaImport({
+        sections: plan.sections ?? [],
         monitors: plan.monitors.filter((m) => monitors.has(m.kuma_id)),
         notifiers: plan.notifiers.filter((n) => notifiers.has(n.kuma_id)),
       }),

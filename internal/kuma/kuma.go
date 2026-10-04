@@ -17,14 +17,19 @@ import (
 
 	"github.com/uptimy/agent/internal/monitor"
 	"github.com/uptimy/agent/internal/notify"
+	"github.com/uptimy/agent/internal/statuspage"
 )
 
 // Plan is what a Kuma database becomes. Nothing is created until it's
 // applied, so people can review it first.
 type Plan struct {
-	Monitors  []Monitor  `json:"monitors"`
-	Notifiers []Notifier `json:"notifiers"`
-	Skipped   []Skipped  `json:"skipped"`
+	// Sections are the groups of Kuma's status pages, in their order. Each
+	// monitor on a page has its section's ID in StatusSection and its place
+	// in StatusOrder.
+	Sections  []statuspage.Section `json:"sections"`
+	Monitors  []Monitor            `json:"monitors"`
+	Notifiers []Notifier           `json:"notifiers"`
+	Skipped   []Skipped            `json:"skipped"`
 }
 
 // Monitor is a Kuma monitor as a healthcheck or heartbeat.
@@ -71,12 +76,16 @@ func Read(ctx context.Context, path string) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
-	plan := Plan{Monitors: []Monitor{}, Notifiers: []Notifier{}, Skipped: []Skipped{}}
+	sections, placement := statusPageGroups(ctx, db)
+	plan := Plan{Sections: sections, Monitors: []Monitor{}, Notifiers: []Notifier{}, Skipped: []Skipped{}}
 	imported := map[int64]bool{}
 	for _, r := range monitors {
 		m, notes, reason := convertMonitor(r)
 		if reason == "" {
 			m.Public = onStatusPage[r.int("id")]
+			if p, ok := placement[r.int("id")]; ok {
+				m.StatusSection, m.StatusOrder = p.section, p.order
+			}
 			if err := m.Normalize(); err != nil {
 				reason = err.Error()
 			}
@@ -132,6 +141,73 @@ func Read(ctx context.Context, path string) (Plan, error) {
 		plan.Notifiers = append(plan.Notifiers, Notifier{KumaID: r.int("id"), Notifier: n, KumaMonitorIDs: kumaMonitors, Notes: notes})
 	}
 	return plan, nil
+}
+
+type place struct {
+	section string
+	order   int
+}
+
+// statusPageGroups reads the groups of Kuma's status pages as sections, in
+// page and group order (same-named groups on different pages become one),
+// and where each monitor goes: the first group it's in. A database without
+// status page groups (or an old layout) gives none, and monitors land in the
+// page's first section.
+func statusPageGroups(ctx context.Context, db *sql.DB) ([]statuspage.Section, map[int64]place) {
+	rows, err := query(ctx, db, `SELECT g.name, mg.monitor_id FROM monitor_group mg JOIN "group" g ON g.id = mg.group_id
+		ORDER BY g.status_page_id, g.weight, g.id, mg.weight, mg.id`)
+	sections := []statuspage.Section{}
+	placement := map[int64]place{}
+	if err != nil {
+		return sections, placement
+	}
+	byName := map[string]string{} // lowercase name → section ID
+	used := map[string]bool{}
+	for _, r := range rows {
+		name := strings.TrimSpace(r.str("name"))
+		if name == "" {
+			name = "Services"
+		}
+		if len(name) > 60 {
+			name = name[:60]
+		}
+		id, ok := byName[strings.ToLower(name)]
+		if !ok {
+			id = sectionID(name, used)
+			byName[strings.ToLower(name)] = id
+			sections = append(sections, statuspage.Section{ID: id, Name: name})
+		}
+		if _, placed := placement[r.int("monitor_id")]; !placed {
+			placement[r.int("monitor_id")] = place{section: id, order: len(placement) + 1}
+		}
+	}
+	return sections, placement
+}
+
+// sectionID makes a unique section ID from a name: "Core APIs" is "core-apis".
+func sectionID(name string, used map[string]bool) string {
+	var b strings.Builder
+	for _, c := range strings.ToLower(name) {
+		switch {
+		case c >= 'a' && c <= 'z', c >= '0' && c <= '9':
+			b.WriteRune(c)
+		case b.Len() > 0 && !strings.HasSuffix(b.String(), "-"):
+			b.WriteByte('-')
+		}
+	}
+	base := strings.Trim(b.String(), "-")
+	if len(base) > 30 {
+		base = strings.Trim(base[:30], "-")
+	}
+	if base == "" {
+		base = "section"
+	}
+	id := base
+	for i := 2; used[id]; i++ {
+		id = fmt.Sprintf("%s-%d", base, i)
+	}
+	used[id] = true
+	return id
 }
 
 // row is a database row, or a Kuma notification's settings, by column name.

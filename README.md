@@ -287,7 +287,7 @@ Under **Settings → Import from Uptime Kuma**, upload Kuma's database (`kuma.db
 docker stop uptime-kuma && docker cp uptime-kuma:/app/data/kuma.db .
 ```
 
-You'll see what each monitor and notification becomes, and choose what to import. HTTP, keyword, TCP port, ping, DNS, TLS, Postgres, MySQL, Redis and push monitors carry over, with their intervals, retries, accepted status codes, headers and basic or bearer auth. So do email, Slack, Teams, Discord, Telegram, ntfy, PagerDuty and webhook notifications, along with which monitors alert where. Monitors that were on a Kuma status page are added to yours. Push monitors become heartbeats with new ping URLs, so update your jobs. Anything that can't be carried over (Docker, gRPC, inverted checks, ...) is listed with the reason. Kuma installs that use MariaDB aren't supported yet.
+You'll see what each monitor and notification becomes, and choose what to import. HTTP, keyword, TCP port, ping, DNS, TLS, Postgres, MySQL, Redis and push monitors carry over, with their intervals, retries, accepted status codes, headers and basic or bearer auth. So do email, Slack, Teams, Discord, Telegram, ntfy, PagerDuty and webhook notifications, plus Pushover, Gotify, Matrix, Mattermost, Google Chat, Rocket.Chat and Opsgenie as "More services (Shoutrrr)" channels, along with which monitors alert where. Monitors that were on a Kuma status page are added to yours, with Kuma's groups as sections, in Kuma's order. Push monitors become heartbeats with new ping URLs, so update your jobs. Anything that can't be carried over (Docker, gRPC, inverted checks, ...) is listed with the reason. Kuma installs that use MariaDB aren't supported yet.
 
 ## Watch the watcher
 

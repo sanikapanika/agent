@@ -26,6 +26,10 @@ func TestKumaImport(t *testing.T) {
 			upside_down BOOLEAN DEFAULT 0, accepted_statuscodes_json TEXT, method TEXT);
 		CREATE TABLE notification (id INTEGER PRIMARY KEY, name TEXT, active BOOLEAN DEFAULT 1, config TEXT);
 		CREATE TABLE monitor_notification (id INTEGER PRIMARY KEY, monitor_id INTEGER, notification_id INTEGER);
+		CREATE TABLE monitor_group (id INTEGER PRIMARY KEY, monitor_id INTEGER, group_id INTEGER, weight INTEGER);
+		CREATE TABLE "group" (id INTEGER PRIMARY KEY, name TEXT, weight INTEGER, status_page_id INTEGER);
+		INSERT INTO "group" (id, name, weight, status_page_id) VALUES (1, 'Public site', 1, 1);
+		INSERT INTO monitor_group (monitor_id, group_id, weight) VALUES (1, 1, 1);
 		INSERT INTO monitor (id, name, type, url, interval) VALUES (1, 'Website', 'http', 'https://example.com', 60);
 		INSERT INTO monitor (id, name, type, interval) VALUES (2, 'Cron', 'push', 300);
 		INSERT INTO monitor (id, name, type, hostname, port) VALUES (3, 'Redis port', 'port', 'redis', 6379);
@@ -61,7 +65,7 @@ func TestKumaImport(t *testing.T) {
 
 	// Import everything but the Redis port.
 	monitors := plan["monitors"].([]any)[:2]
-	code, result := c.do("POST", "/api/import/kuma/apply", map[string]any{"monitors": monitors, "notifiers": plan["notifiers"]})
+	code, result := c.do("POST", "/api/import/kuma/apply", map[string]any{"sections": plan["sections"], "monitors": monitors, "notifiers": plan["notifiers"]})
 	if code != 200 || len(result["monitors"].([]any)) != 2 || len(result["notifiers"].([]any)) != 1 {
 		t.Fatalf("apply: %d %v", code, result)
 	}
@@ -72,6 +76,20 @@ func TestKumaImport(t *testing.T) {
 	_, heartbeats := c.doList("GET", "/api/heartbeats")
 	if len(heartbeats) != 1 || heartbeats[0]["heartbeat"].(map[string]any)["every_seconds"] != float64(300) {
 		t.Fatalf("heartbeat: %v", heartbeats)
+	}
+
+	// Kuma's status page group became a section, after the page's own, with
+	// the website in it.
+	_, page := c.do("GET", "/api/status-page", nil)
+	sections := page["sections"].([]any)
+	if len(sections) != 2 || sections[1].(map[string]any)["name"] != "Public site" {
+		t.Fatalf("sections: %v", sections)
+	}
+	for _, m := range page["monitors"].([]any) {
+		m := m.(map[string]any)
+		if m["name"] == "Website" && (m["public"] != true || m["section"] != sections[1].(map[string]any)["id"]) {
+			t.Fatalf("website on the page: %v", m)
+		}
 	}
 
 	// Importing again skips what exists.

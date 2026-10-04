@@ -22,7 +22,8 @@ CREATE TABLE monitor (
 );
 CREATE TABLE notification (id INTEGER PRIMARY KEY, name TEXT, active BOOLEAN DEFAULT 1, is_default BOOLEAN DEFAULT 0, config TEXT);
 CREATE TABLE monitor_notification (id INTEGER PRIMARY KEY, monitor_id INTEGER, notification_id INTEGER);
-CREATE TABLE monitor_group (id INTEGER PRIMARY KEY, monitor_id INTEGER, group_id INTEGER);
+CREATE TABLE monitor_group (id INTEGER PRIMARY KEY, monitor_id INTEGER, group_id INTEGER, weight INTEGER DEFAULT 1000);
+CREATE TABLE "group" (id INTEGER PRIMARY KEY, name TEXT, public BOOLEAN DEFAULT 0, active BOOLEAN DEFAULT 1, weight INTEGER DEFAULT 1000, status_page_id INTEGER);
 
 INSERT INTO monitor (id, name, type, url, interval, maxretries, timeout, accepted_statuscodes_json, auth_method, basic_auth_user, basic_auth_pass, headers)
 	VALUES (1, 'Website', 'http', 'https://example.com', 60, 2, 48, '["200-299","301"]', 'basic', 'ops', 's3cret', '{"X-Env":"prod"}');
@@ -40,9 +41,17 @@ INSERT INTO notification (id, name, active, config) VALUES
 	(1, 'Ops Slack', 1, '{"type":"slack","slackwebhookURL":"https://hooks.slack.com/services/T/B/x"}'),
 	(2, 'On-call', 1, '{"type":"PagerDuty","pagerdutyIntegrationKey":"0123456789abcdef0123456789abcdef"}'),
 	(3, 'Mail', 0, '{"type":"smtp","smtpHost":"smtp.example.com","smtpPort":465,"smtpSecure":true,"smtpFrom":"kuma@example.com","smtpTo":"ops@example.com","smtpCC":"cto@example.com"}'),
-	(4, 'Gotify', 1, '{"type":"gotify","gotifyserverurl":"https://gotify.example.com"}');
+	(4, 'Gotify', 1, '{"type":"gotify","gotifyserverurl":"http://gotify.lan:8080/","gotifyapplicationToken":"AbCdEf","gotifyPriority":8}'),
+	(5, 'Pushover', 1, '{"type":"pushover","pushoveruserkey":"uKey123","pushoverapptoken":"aToken456","pushoverdevice":"phone"}'),
+	(6, 'Matrix', 1, '{"type":"matrix","homeserverUrl":"https://matrix.org","internalRoomId":"!abc:matrix.org","accessToken":"syt_token"}'),
+	(7, 'Mattermost', 1, '{"type":"mattermost","mattermostWebhookUrl":"https://mm.example.com/hooks/xyz789","mattermostchannel":"alerts","mattermostusername":"kuma"}'),
+	(8, 'Google Chat', 1, '{"type":"GoogleChat","googleChatWebhookURL":"https://chat.googleapis.com/v1/spaces/AAA/messages?key=k1&token=t1"}'),
+	(9, 'Rocket', 1, '{"type":"rocket.chat","rocketwebhookURL":"https://rocket.example.com/hooks/tokenA/tokenB","rocketchannel":"#ops"}'),
+	(10, 'Opsgenie EU', 1, '{"type":"Opsgenie","opsgenieApiKey":"og-key","opsgenieRegion":"eu"}'),
+	(11, 'Broken Gotify', 1, '{"type":"gotify","gotifyserverurl":"not a url"}');
 INSERT INTO monitor_notification (monitor_id, notification_id) VALUES (1,1),(2,1),(3,1),(4,1),(5,1),(6,1),(7,1),(7,2),(8,2);
-INSERT INTO monitor_group (monitor_id, group_id) VALUES (1, 1);
+INSERT INTO "group" (id, name, weight, status_page_id) VALUES (1, 'Core APIs', 2, 1), (2, 'Website', 1, 1), (3, 'core apis', 1, 2);
+INSERT INTO monitor_group (monitor_id, group_id, weight) VALUES (1, 2, 1), (7, 1, 2), (3, 1, 1), (3, 3, 1);
 `
 
 func kumaDB(t *testing.T) string {
@@ -104,7 +113,7 @@ func TestRead(t *testing.T) {
 		skipped[s.Name] = s.Reason
 	}
 	for name, want := range map[string]string{
-		"Container": "Docker container monitors", "Inverted": "upside-down", "No error": "inverted keyword", "Gotify": "gotify notifications",
+		"Container": "Docker container monitors", "Inverted": "upside-down", "No error": "inverted keyword", "Broken Gotify": "Gotify server URL",
 	} {
 		if !strings.Contains(skipped[name], want) {
 			t.Errorf("%s skipped for %q, want %q", name, skipped[name], want)
@@ -123,6 +132,38 @@ func TestRead(t *testing.T) {
 	if pd := notifiers["On-call"]; pd.Notifier.AllMonitors || len(pd.KumaMonitorIDs) != 1 || pd.KumaMonitorIDs[0] != 7 || pd.Notifier.Type != "pagerduty" {
 		t.Fatalf("pagerduty: %+v", pd)
 	}
+	// Services the agent reaches through Shoutrrr become "More services" channels.
+	for name, want := range map[string]string{
+		"Gotify":      "gotify://gotify.lan:8080/AbCdEf?disabletls=yes&priority=8",
+		"Pushover":    "pushover://shoutrrr:aToken456@uKey123/?devices=phone",
+		"Matrix":      "matrix://:syt_token@matrix.org/?rooms=%21abc%3Amatrix.org",
+		"Mattermost":  "mattermost://kuma@mm.example.com/xyz789/alerts",
+		"Google Chat": "googlechat://chat.googleapis.com/v1/spaces/AAA/messages?key=k1&token=t1",
+		"Rocket":      "rocketchat://rocket.example.com/tokenA/tokenB/%23ops",
+		"Opsgenie EU": "opsgenie://api.eu.opsgenie.com/og-key",
+	} {
+		n, ok := notifiers[name]
+		if !ok || n.Notifier.Type != "shoutrrr" || n.Notifier.Config.URL != want {
+			t.Errorf("%s: %+v (skipped: %q), want %s", name, n.Notifier, skipped[name], want)
+		}
+	}
+
+	// Status page groups become sections, in Kuma's order; same-named groups
+	// on two pages are one section, and a monitor goes in its first group.
+	if len(plan.Sections) != 2 || plan.Sections[0].Name != "Website" || plan.Sections[0].ID != "website" ||
+		plan.Sections[1].Name != "Core APIs" || plan.Sections[1].ID != "core-apis" {
+		t.Fatalf("sections: %+v", plan.Sections)
+	}
+	for name, want := range map[string]struct {
+		section string
+		order   int
+	}{"Website": {"website", 1}, "Postgres port": {"core-apis", 2}, "Main DB": {"core-apis", 3}} {
+		m := byName[name].Monitor
+		if !m.Public || m.StatusSection != want.section || m.StatusOrder != want.order {
+			t.Errorf("%s: public=%v section=%q order=%d, want %+v", name, m.Public, m.StatusSection, m.StatusOrder, want)
+		}
+	}
+
 	mail := notifiers["Mail"].Notifier
 	if mail.Type != "email" || mail.Enabled || mail.Config.SMTPSecurity != "tls" || mail.Config.SMTPTo != "ops@example.com,cto@example.com" {
 		t.Fatalf("email: %+v", mail)
