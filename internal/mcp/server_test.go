@@ -128,9 +128,9 @@ func TestConcurrencyIncludesAuthentication(t *testing.T) {
 		}
 		return store.User{ID: 1, Role: "viewer"}, store.APIToken{}, nil
 	})
-	h := protect(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) }), tokens, map[string]bool{"localhost": true}, 1)
+	h := protect(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }), tokens, map[string]bool{"localhost": true}, 1)
 	request := func() *http.Request {
-		r := httptest.NewRequest("POST", "http://localhost/mcp", strings.NewReader(`{}`))
+		r := httptest.NewRequest(http.MethodPost, "http://localhost/mcp", strings.NewReader(`{}`))
 		r.Header.Set("Authorization", "Bearer upa_test")
 		return r
 	}
@@ -243,7 +243,7 @@ func TestSDKBatchAndToolConcurrency(t *testing.T) {
 	defer s.Close()
 	request := func(body string) int {
 		t.Helper()
-		r, err := http.NewRequest("POST", s.URL, strings.NewReader(body))
+		r, err := http.NewRequest(http.MethodPost, s.URL, strings.NewReader(body))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -382,7 +382,7 @@ func TestAllowedHostsRequired(t *testing.T) {
 	for _, hosts := range [][]string{nil, {"*"}, {"http://localhost"}, {"localhost:"}, {"localhost:0"}, {"localhost:65536"}, {"localhost/path"}} {
 		h := New(&investigation.Service{}, validTokens(), Options{AllowedHosts: hosts})
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, httptest.NewRequest("POST", "http://localhost/mcp", strings.NewReader(`{}`)))
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "http://localhost/mcp", strings.NewReader(`{}`)))
 		if w.Code != http.StatusServiceUnavailable {
 			t.Fatalf("unsafe hosts accepted: %v", hosts)
 		}
@@ -402,9 +402,9 @@ func TestAuthenticationEveryRequest(t *testing.T) {
 		}
 		return store.User{}, store.APIToken{}, store.ErrNotFound
 	})
-	h := protect(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) }), tokens, map[string]bool{"localhost": true}, 1)
+	h := protect(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }), tokens, map[string]bool{"localhost": true}, 1)
 	for _, status := range []int{204, 401} {
-		r := httptest.NewRequest("POST", "http://localhost/mcp", strings.NewReader(`{}`))
+		r := httptest.NewRequest(http.MethodPost, "http://localhost/mcp", strings.NewReader(`{}`))
 		r.Header.Set("Authorization", "Bearer upa_test")
 		r.Header.Set("Mcp-Session-Id", "previous-session")
 		w := httptest.NewRecorder()

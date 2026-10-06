@@ -15,7 +15,7 @@ func TestMCPRoutingAndStatusDomainIsolation(t *testing.T) {
 		host string
 		code int
 	}{{"status.example.com", 404}, {"agent.internal", 204}} {
-		r := httptest.NewRequest("POST", "/mcp", nil)
+		r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 		r.Host = tc.host
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, r)
@@ -26,7 +26,7 @@ func TestMCPRoutingAndStatusDomainIsolation(t *testing.T) {
 	c.srv.MCP = nil
 	h = c.srv.Handler(http.NotFoundHandler())
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest("POST", "/mcp", nil))
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/mcp", nil))
 	if w.Code != 404 {
 		t.Fatalf("disabled endpoint: %d", w.Code)
 	}

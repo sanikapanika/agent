@@ -53,7 +53,7 @@ func authority(raw string) (string, bool) {
 				return "", false
 			}
 			for _, c := range label {
-				if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-') {
+				if (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '-' {
 					return "", false
 				}
 			}
@@ -112,10 +112,10 @@ func protect(next http.Handler, tokens identity.TokenStore, hosts map[string]boo
 		deadline, _ := ctx.Deadline()
 		controller := http.NewResponseController(w)
 		if controller.SetReadDeadline(deadline) == nil {
-			defer controller.SetReadDeadline(time.Time{})
+			defer func() { _ = controller.SetReadDeadline(time.Time{}) }()
 		}
 		if controller.SetWriteDeadline(deadline) == nil {
-			defer controller.SetWriteDeadline(time.Time{})
+			defer func() { _ = controller.SetWriteDeadline(time.Time{}) }()
 		}
 		p, err := identity.Authenticate(ctx, r, tokens)
 		if err != nil {

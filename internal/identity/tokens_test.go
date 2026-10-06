@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -41,7 +42,7 @@ func TestAuthenticate(t *testing.T) {
 		{name: "password change", headers: []string{"Bearer upa_test"}, user: store.User{ID: 1, Role: "admin", MustChangePassword: true}, wantLookup: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r := httptest.NewRequest("POST", "http://localhost/mcp?token=upa_test", nil)
+			r := httptest.NewRequest(http.MethodPost, "http://localhost/mcp?token=upa_test", nil)
 			r.Header["Authorization"] = tc.headers
 			r.Header.Set("Cookie", "session=valid")
 			called := false
@@ -62,14 +63,14 @@ func TestAuthenticate(t *testing.T) {
 				if err != nil || p != want {
 					t.Fatalf("principal=%+v err=%v, want %+v", p, err, want)
 				}
-			} else if err != ErrUnauthenticated || p != (Principal{}) {
+			} else if !errors.Is(err, ErrUnauthenticated) || p != (Principal{}) {
 				t.Fatalf("failure was not sanitized: %+v, %v", p, err)
 			}
 		})
 	}
-	r := httptest.NewRequest("POST", "http://localhost/mcp", nil)
+	r := httptest.NewRequest(http.MethodPost, "http://localhost/mcp", nil)
 	r.Header.Set("Authorization", "Bearer upa_test")
-	if _, err := Authenticate(context.Background(), r, nil); err != ErrUnauthenticated {
+	if _, err := Authenticate(context.Background(), r, nil); !errors.Is(err, ErrUnauthenticated) {
 		t.Fatalf("nil token store accepted: %v", err)
 	}
 }
